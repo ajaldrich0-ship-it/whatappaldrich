@@ -928,22 +928,40 @@
                     <div class="max-w-xl mx-auto panel-card p-8 rounded-3xl text-center space-y-8 relative overflow-hidden">
                         <!-- QR Setup View -->
                         <div id="qr-setup-view" class="space-y-6">
-                            <div class="space-y-2">
-                                <h3 class="text-2xl font-bold text-slate-800 tracking-tight">Connect WhatsApp Session</h3>
-                                <p class="text-sm text-slate-500">Scan the QR code below using your phone's WhatsApp linked devices.</p>
-                            </div>
-                            
-                            <!-- QR Container -->
-                            <div class="w-64 h-64 mx-auto bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-center relative overflow-hidden p-4">
-                                <div id="qr-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/90 gap-3">
-                                    <div class="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-                                    <span class="text-xs text-slate-500 font-semibold">Generating QR Code...</span>
+                            <!-- State 1: Offline / Disconnected (Requires action to start) -->
+                            <div id="start-connection-container" class="space-y-6">
+                                <div class="w-20 h-20 mx-auto rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                    <i data-lucide="power" class="w-10 h-10 text-slate-400"></i>
                                 </div>
-                                <img id="qr-image" src="" alt="WhatsApp QR Code" class="hidden w-full h-full object-contain rounded-2xl">
+                                <div class="space-y-2">
+                                    <h3 class="text-2xl font-bold text-slate-800 tracking-tight">WhatsApp Bot Offline</h3>
+                                    <p class="text-sm text-slate-500">Initialize the connection to start the bot, link your device, or resume a saved session.</p>
+                                </div>
+                                <button onclick="initializeWhatsAppConnection()"
+                                    class="px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 mx-auto">
+                                    <i data-lucide="play" class="w-4 h-4"></i> Start WhatsApp Connection
+                                </button>
                             </div>
 
-                            <div class="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
-                                <i data-lucide="info" class="w-4 h-4 text-blue-600"></i> Open WhatsApp > Linked Devices > Link a Device
+                            <!-- State 2: QR Scanner / Initializing (Shown when client is active) -->
+                            <div id="qr-code-wrapper" class="hidden space-y-6">
+                                <div class="space-y-2">
+                                    <h3 class="text-2xl font-bold text-slate-800 tracking-tight">Connect WhatsApp Session</h3>
+                                    <p class="text-sm text-slate-500">Scan the QR code below using your phone's WhatsApp linked devices.</p>
+                                </div>
+                                
+                                <!-- QR Container -->
+                                <div class="w-64 h-64 mx-auto bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-center relative overflow-hidden p-4">
+                                    <div id="qr-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/90 gap-3">
+                                        <div class="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                                        <span class="text-xs text-slate-500 font-semibold">Generating QR Code...</span>
+                                    </div>
+                                    <img id="qr-image" src="" alt="WhatsApp QR Code" class="hidden w-full h-full object-contain rounded-2xl">
+                                </div>
+
+                                <div class="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                                    <i data-lucide="info" class="w-4 h-4 text-blue-600"></i> Open WhatsApp > Linked Devices > Link a Device
+                                </div>
                             </div>
                         </div>
 

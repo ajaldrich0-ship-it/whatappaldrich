@@ -584,23 +584,8 @@ app.post('/api/connect', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-// Auto-restore session on boot only if session files exist
-const sessionDir = path.join(__dirname, '../session');
-let hasSession = false;
-try {
-  if (fs.existsSync(sessionDir) && fs.readdirSync(sessionDir).length > 0) {
-    hasSession = true;
-  }
-} catch (err) {
-  // ignore
-}
-
-if (hasSession) {
-  logToSystem('Saved session cache found. Auto-connecting WhatsApp...', 'info');
-  initializeWhatsApp();
-} else {
-  logToSystem('No saved session. Open Settings (WhatsApp Link) in the dashboard to generate a QR code.', 'info');
-}
+// Passive startup message; connection is initiated manually from settings dashboard
+logToSystem('Server started. Log into the dashboard and go to settings to connect WhatsApp.', 'info');
 
 // Serve the index.html on root route
 app.get('/', (req, res) => {

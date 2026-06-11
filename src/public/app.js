@@ -717,9 +717,9 @@ function initSocket() {
       qrSetupView.classList.remove('hidden');
       qrConnectedView.classList.add('hidden');
       
-      // Show spinner in QR wrapper
-      document.getElementById('qr-spinner').classList.remove('hidden');
-      document.getElementById('qr-image').classList.add('hidden');
+      // Show start connection, hide qr code wrapper
+      document.getElementById('start-connection-container').classList.remove('hidden');
+      document.getElementById('qr-code-wrapper').classList.add('hidden');
       
       document.getElementById('profile-container').classList.add('hidden');
     } 
@@ -732,6 +732,9 @@ function initSocket() {
       qrSetupView.classList.remove('hidden');
       qrConnectedView.classList.add('hidden');
       
+      // Hide start connection, show qr spinner/wrapper
+      document.getElementById('start-connection-container').classList.add('hidden');
+      document.getElementById('qr-code-wrapper').classList.remove('hidden');
       document.getElementById('qr-spinner').classList.remove('hidden');
       document.getElementById('qr-image').classList.add('hidden');
       
@@ -745,6 +748,10 @@ function initSocket() {
       
       qrSetupView.classList.remove('hidden');
       qrConnectedView.classList.add('hidden');
+      
+      // Hide start connection, show qr wrapper
+      document.getElementById('start-connection-container').classList.add('hidden');
+      document.getElementById('qr-code-wrapper').classList.remove('hidden');
       
       document.getElementById('profile-container').classList.add('hidden');
     } 
@@ -809,6 +816,35 @@ function disconnectSocket() {
   if (socket) {
     socket.disconnect();
     socket = null;
+  }
+}
+
+async function initializeWhatsAppConnection() {
+  const btn = document.querySelector('#start-connection-container button');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> Starting...';
+  }
+  
+  try {
+    const res = await fetch('/api/connect', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    if (!res.ok) {
+      alert('Failed to start WhatsApp connection.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Network error starting connection.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> Start WhatsApp Connection';
+      updateIcons();
+    }
   }
 }
 
