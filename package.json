@@ -8,7 +8,7 @@
     "start-cli": "node src/index.js",
     "send": "node src/send-message.js",
     "bulk": "node src/bulk-sender.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "postinstall": "npx -y puppeteer browsers install chrome"
   },
   "dependencies": {
     "cors": "^2.8.6",
