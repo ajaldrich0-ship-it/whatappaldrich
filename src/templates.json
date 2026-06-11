@@ -1,0 +1,12 @@
+[
+  {
+    "id": "1",
+    "name": "Address Details",
+    "content": "Our office is located at: 123 Main Street, Suite 400. Open Mon-Fri 9am-5pm."
+  },
+  {
+    "id": "2",
+    "name": "Bank Details",
+    "content": "Bank Name: State Bank\nAccount: 1234567890\nIFSC Code: STAT000123"
+  }
+]

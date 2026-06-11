@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50 text-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Bot Manager</title>
+    <link rel="icon" type="image/png" href="/media/favicon.png">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SheetJS Excel/CSV Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Custom Light-Theme Styles -->
+    <style>
+        .panel-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0; /* border-slate-200 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        }
+        .card-hover:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(226, 232, 240, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
+
+        /* Neon and Professional Theme Animations */
+        @keyframes neon-flow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .neon-line {
+            background: linear-gradient(90deg, #2563eb, #60a5fa, #3b82f6, #1d4ed8, #2563eb);
+            background-size: 200% auto;
+            animation: neon-flow 4s linear infinite;
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(37, 99, 235, 0.25); box-shadow: 0 0 10px rgba(37, 99, 235, 0.04); }
+            50% { border-color: rgba(37, 99, 235, 0.7); box-shadow: 0 0 18px rgba(37, 99, 235, 0.15); }
+        }
+        .neon-glow-border {
+            border: 1.5px solid rgba(37, 99, 235, 0.25);
+            animation: pulse-border 3s infinite ease-in-out;
+        }
+
+        .premium-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .premium-card:hover {
+            border-color: rgba(37, 99, 235, 0.5);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -10px rgba(37, 99, 235, 0.18);
+        }
+
+        .btn-shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-shimmer::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+            transform: skewX(-25deg);
+            transition: 0.75s;
+        }
+        .btn-shimmer:hover::after {
+            left: 150%;
+            transition: 0.75s;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans overflow-x-hidden bg-slate-50 selection:bg-blue-500 selection:text-white">
+
+    <!-- Flowing Neon Line -->
+    <div class="h-[4px] w-full neon-line shrink-0 z-50"></div>
+
+    <!-- Ambient background -->
+    <div class="fixed inset-0 z-[-1] bg-slate-50"></div>
+
+    <!-- LANDING PAGE -->
+    <div id="landing-page" class="min-h-full flex flex-col justify-between">
+        <!-- Header -->
+        <header class="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between z-10 gap-4">
+            <div class="flex items-center">
+                <img src="/media/logo.png" alt="Kaira Technologies Logo" class="h-10 md:h-12 object-contain rounded-xl">
+            </div>
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50/50 text-xs font-semibold text-blue-600 neon-glow-border">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> Now Live & Real-Time
+            </div>
+            <button onclick="showLogin()" class="btn-shimmer px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 hover:border-blue-500/50 hover:text-blue-600 shadow-sm transition-all duration-300 flex items-center gap-2 shrink-0">
+                <i data-lucide="lock" class="w-4 h-4 text-blue-600"></i> Login
+            </button>
+        </header>
+
+        <!-- Hero -->
+        <main class="flex-grow flex flex-col items-center justify-start px-6 py-4 md:py-6 z-10">
+            <div class="max-w-4xl text-center space-y-4 mb-4">
+                
+                <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-slate-900">
+                    Automate & Manage Your <br>
+                    <span class="text-blue-600 font-extrabold">
+                        WhatsApp Messages
+                    </span>
+                </h1>
+               
+            
+            </div>
+
+            <!-- Interactive Live Mockup Showcase (Inspired by Dashboard mockup) -->
+            <div class="w-full max-w-5xl mt-2 mb-6 grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white border border-slate-200/80 p-6 rounded-[28px] shadow-xl relative overflow-hidden select-none">
+                
+                <!-- Background ambient decorative circles -->
+                <div class="absolute -left-16 -top-16 w-48 h-48 rounded-full border border-slate-100 pointer-events-none"></div>
+                <div class="absolute -right-16 -bottom-16 w-48 h-48 rounded-full border border-slate-100 pointer-events-none"></div>
+
+                <!-- Left Column Cards -->
+                <div class="md:col-span-3 space-y-6">
+                    <!-- Card 1: Automated Campaigns -->
+                    <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Automated Campaigns</span>
+                            <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <i data-lucide="bot" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-3xl font-extrabold text-slate-800" id="mock-campaigns-val">23</span>
+                            <span class="text-[10px] text-slate-500 font-medium">Active Campaigns</span>
+                        </div>
+                        <!-- Mini sparkline SVG -->
+                        <div class="pt-2">
+                            <svg class="w-full h-10 stroke-emerald-500 fill-none" stroke-width="2" stroke-linecap="round" viewBox="0 0 100 30">
+                                <path id="mock-sparkline-1" d="M 0 25 L 20 18 L 40 22 L 60 10 L 80 15 L 100 5"></path>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Message Templates -->
+                    <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Message Templates</span>
+                            <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                <i data-lucide="file-text" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-3xl font-extrabold text-slate-800" id="mock-templates-val">56</span>
+                            <span class="text-[10px] text-slate-500 font-medium">Templates</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 pt-1">
+                            <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[9px] font-bold border border-emerald-100">Approved</span>
+                            <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[9px] font-bold border border-emerald-100">Approved</span>
+                            <span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded text-[9px] font-bold border border-amber-100">Pending</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Mobile Frame Mockup -->
+                <div class="md:col-span-6 flex justify-center">
+                    <div class="w-72 h-[460px] bg-slate-900 rounded-[40px] p-3 shadow-2xl relative border-[6px] border-slate-850 ring-4 ring-slate-100/50">
+                        <!-- Top Notch -->
+                        <div class="absolute top-4 left-1/2 -translate-x-1/2 w-28 h-4 bg-slate-900 rounded-full z-20 flex items-center justify-center gap-1.5">
+                            <span class="w-8 h-1 bg-slate-800 rounded-full"></span>
+                            <span class="w-1.5 h-1.5 bg-slate-800 rounded-full"></span>
+                        </div>
+                        
+                        <!-- Internal screen view -->
+                        <div class="w-full h-full bg-slate-50 rounded-[30px] overflow-hidden p-4 flex flex-col justify-between relative text-left pt-6 border border-slate-200">
+                            
+                            <!-- Internal Header -->
+                            <div class="flex items-center justify-between border-b border-slate-200/50 pb-2 mb-2">
+                                <span class="text-[10px] font-bold text-slate-700 tracking-tight">Kaira Dashboard</span>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-[8px] text-slate-400 font-bold">Connected</span>
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                </div>
+                            </div>
+
+                            <!-- Phone WhatsApp status -->
+                            <div class="bg-emerald-600 text-white p-3 rounded-xl space-y-0.5 shadow-sm">
+                                <div class="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wider opacity-90">
+                                    <i data-lucide="link" class="w-3 h-3"></i> WhatsApp Connector
+                                </div>
+                                <div class="text-xs font-bold flex items-center justify-between">
+                                    <span>Connected & Running</span>
+                                    <span class="text-[9px] font-medium bg-emerald-700/50 px-1.5 py-0.5 rounded">Active</span>
+                                </div>
+                            </div>
+
+                            <!-- Dashboard Stats -->
+                            <div class="grid grid-cols-2 gap-2 my-2">
+                                <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+                                    <div class="text-[8px] text-slate-400 font-bold uppercase">Sent</div>
+                                    <div class="text-sm font-extrabold text-slate-800" id="mock-sent-val">1,248</div>
+                                    <div class="text-[8px] text-emerald-600 font-bold mt-0.5">↑ 18.6% vs last month</div>
+                                </div>
+                                <div class="bg-white border border-slate-200 rounded-xl p-2.5 shadow-sm">
+                                    <div class="text-[8px] text-slate-400 font-bold uppercase">Received</div>
+                                    <div class="text-sm font-extrabold text-slate-800" id="mock-received-val">968</div>
+                                    <div class="text-[8px] text-emerald-600 font-bold mt-0.5">↑ 12.4% vs last month</div>
+                                </div>
+                            </div>
+
+                            <!-- Phone status circle -->
+                            <div class="bg-white border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-sm">
+                                <div class="relative w-12 h-12 flex items-center justify-center shrink-0">
+                                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                        <path class="text-slate-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                                        <path id="mock-radial-circle" class="text-emerald-500" stroke-dasharray="85, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                                    </svg>
+                                    <div class="absolute text-[9px] font-bold text-slate-850" id="mock-radial-text">85%</div>
+                                </div>
+                                <div class="text-[9px] font-bold space-y-0.5">
+                                    <div class="text-[8px] text-slate-400 uppercase tracking-wide">Automation rate</div>
+                                    <div class="text-slate-700 flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                                    </div>
+                                    <div class="text-slate-400 flex items-center gap-1 font-medium">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span> Stopped
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Phone Bottom quick action tools -->
+                            <div class="mt-2 text-[8px] font-bold text-slate-400 uppercase tracking-wider">Quick Actions</div>
+                            <div class="grid grid-cols-4 gap-1.5 text-center mt-1 border-t border-slate-100 pt-2">
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                    <span class="text-[7px] font-bold text-slate-500">Send</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <div class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <i data-lucide="bot-message-square" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                    <span class="text-[7px] font-bold text-slate-500">Auto</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                    <span class="text-[7px] font-bold text-slate-500">Schedule</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <div class="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                        <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                                    </div>
+                                    <span class="text-[7px] font-bold text-slate-500">Link</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column Cards -->
+                <div class="md:col-span-3 space-y-6">
+                    <!-- Auto Reply Module -->
+                    <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 shadow-sm text-left">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Auto Reply</span>
+                            <span class="w-7 h-4 bg-emerald-500 rounded-full p-0.5 flex justify-end cursor-pointer"><span class="w-3 h-3 bg-white rounded-full shadow-sm"></span></span>
+                        </div>
+                        <div class="space-y-1.5 text-xs font-semibold text-slate-650">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                                <span class="text-slate-600">Welcome Message</span>
+                                <span class="text-emerald-500 text-[10px] font-bold bg-emerald-50 px-1 rounded">Active</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                                <span class="text-slate-600">Away Message</span>
+                                <span class="text-emerald-500 text-[10px] font-bold bg-emerald-50 px-1 rounded">Active</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-600">Business Hours</span>
+                                <span class="text-emerald-500 text-[10px] font-bold bg-emerald-50 px-1 rounded">Active</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Conversations list -->
+                    <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 shadow-sm text-left">
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">Recent Conversations</div>
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between gap-1.5">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">JD</div>
+                                    <div>
+                                        <div class="text-[10px] font-bold text-slate-800 leading-tight">John Doe</div>
+                                        <div class="text-[9px] text-slate-400 mt-0.5 truncate max-w-[80px]">Hi, I need more information...</div>
+                                    </div>
+                                </div>
+                                <span class="text-[8px] text-slate-400">10:30 AM</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-1.5">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600">SS</div>
+                                    <div>
+                                        <div class="text-[10px] font-bold text-slate-800 leading-tight">Sarah Smith</div>
+                                        <div class="text-[9px] text-slate-400 mt-0.5 truncate max-w-[80px]">Thank you! 👍</div>
+                                    </div>
+                                </div>
+                                <span class="text-[8px] text-slate-400">09:15 AM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-2 mb-6">
+                    <button onclick="showLogin()" class="btn-shimmer w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/15 hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2">
+                        Get Started <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                    <a href="#features" class="w-full sm:w-auto px-8 py-4 bg-white border border-slate-200 text-slate-600 font-semibold rounded-2xl hover:bg-slate-50 transition-all duration-300 flex items-center justify-center">
+                        Explore Features
+                    </a>
+            </div>
+
+
+            <!-- Features Grid Section -->
+            <div id="features" class="w-full max-w-7xl mx-auto py-4 scroll-mt-20">
+                <div class="text-center space-y-3 mb-6">
+                    <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900">Supercharged Messaging Toolkit</h2>
+                    <p class="text-slate-500 max-w-lg mx-auto text-sm font-medium">Everything you need to automate your customer communication flow in one dashboard.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Real-Time Overview</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Monitor incoming and outgoing message volumes, view live server uptime, and watch backend logs stream in real-time on our interactive console.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Launch Tool</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="calendar" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Message Scheduler</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Schedule messages to be dispatched at a precise date and time in the future. Perfect for follow-ups, birthday wishes, and reminder alerts.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Schedule message</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="bot" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Smart Auto-Replies</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Define customized keyword triggers and response texts. Let the bot reply to standard customer questions instantly, even while you sleep.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Configure replies</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Quick-Reply Templates</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Save FAQs, addresses, or payment details as templates. Load them in one click to autofill your message composer and speed up response times.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Manage templates</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feature 5 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="users" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Bulk Campaigns</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Upload bulk phone lists and send mass broadcasts. Includes customizable anti-spam delays to protect your phone number from bans.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Launch campaign</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+
+                    <!-- Feature 6 -->
+                    <div class="premium-card p-8 rounded-3xl space-y-4 group relative overflow-hidden">
+                        <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
+                        <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i data-lucide="shield-check" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800">Multi-User Security</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed font-light">Allow multiple agents to register accounts. Password data is hashed with SHA-256 locally on your database for complete credential privacy.</p>
+                        <div class="pt-2 flex items-center text-xs font-bold text-blue-600 hover:text-blue-500 cursor-pointer transition-colors gap-1" onclick="showLogin()">
+                            <span>Secure portal</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="w-full text-center py-8 text-sm text-slate-500 z-10 border-t border-slate-200">
+            &copy; 2026 Kaira Technologies. Powering professional automations.
+        </footer>
+    </div>
+
+    <!-- LOGIN MODAL / PAGE -->
+    <div id="login-page" class="hidden min-h-full flex items-center justify-center px-6 py-12 z-10">
+        <div class="w-full max-w-md p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-col items-center mb-8">
+                <img src="/media/logo.png" alt="Logo" class="h-24 object-contain rounded-2xl mb-4">
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900">Administrator Login</h2>
+                <p class="text-sm text-slate-500 mt-1">Authenticate to access the live dashboard</p>
+            </div>
+
+            <form id="login-form" class="space-y-5">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Username</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-4 top-3.5 w-5 h-5 text-slate-400"></i>
+                        <input type="text" id="username" required
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-250 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 transition-all placeholder:text-slate-400"
+                            placeholder="Enter username">
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Password</label>
+                    <div class="relative">
+                        <i data-lucide="key-round" class="absolute left-4 top-3.5 w-5 h-5 text-slate-400"></i>
+                        <input type="password" id="password" required
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-250 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 transition-all placeholder:text-slate-400"
+                            placeholder="Enter password">
+                    </div>
+                </div>
+
+                <div id="login-error" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-600 text-sm rounded-xl text-center">
+                    Invalid username or password
+                </div>
+
+                <button type="submit"
+                    class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg hover:shadow-blue-600/10 active:translate-y-0 transition-all duration-300 mt-2 flex items-center justify-center gap-2">
+                    Access Dashboard <i data-lucide="log-in" class="w-4 h-4"></i>
+                </button>
+            </form>
+
+            <div class="mt-4 text-center text-xs text-slate-500">
+                Don't have an account? <a href="#" onclick="showSignup(event)" class="text-blue-600 font-semibold hover:underline">Create Account</a>
+            </div>
+
+            <button onclick="showLanding()" class="w-full mt-4 text-center text-sm text-slate-500 hover:text-slate-700 transition-colors">
+                Back to Home
+            </button>
+        </div>
+    </div>
+
+    <!-- SIGNUP MODAL / PAGE -->
+    <div id="signup-page" class="hidden min-h-full flex items-center justify-center px-6 py-12 z-10">
+        <div class="w-full max-w-md p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-col items-center mb-8">
+                <img src="/media/logo.png" alt="Logo" class="h-24 object-contain rounded-2xl mb-4">
+                <h2 class="text-2xl font-bold tracking-tight text-slate-900">Create Account</h2>
+                <p class="text-sm text-slate-500 mt-1">Sign up to manage your WhatsApp Bot</p>
+            </div>
+
+            <form id="signup-form" class="space-y-5">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Username</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-4 top-3.5 w-5 h-5 text-slate-400"></i>
+                        <input type="text" id="signup-username" required
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-250 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 transition-all placeholder:text-slate-400"
+                            placeholder="Choose username">
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Password</label>
+                    <div class="relative">
+                        <i data-lucide="key-round" class="absolute left-4 top-3.5 w-5 h-5 text-slate-400"></i>
+                        <input type="password" id="signup-password" required
+                            class="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-250 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-slate-800 transition-all placeholder:text-slate-400"
+                            placeholder="Create password">
+                    </div>
+                </div>
+
+                <div id="signup-error" class="hidden p-3 bg-rose-50 border border-rose-200 text-rose-600 text-sm rounded-xl text-center">
+                    Username already exists
+                </div>
+                <div id="signup-success" class="hidden p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 text-sm rounded-xl text-center font-medium">
+                    Account created! Redirecting to login...
+                </div>
+
+                <button type="submit"
+                    class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg hover:shadow-blue-600/10 active:translate-y-0 transition-all duration-300 mt-2 flex items-center justify-center gap-2">
+                    Sign Up <i data-lucide="user-check" class="w-4 h-4"></i>
+                </button>
+            </form>
+
+            <div class="mt-4 text-center text-xs text-slate-500">
+                Already have an account? <a href="#" onclick="showLogin(event)" class="text-blue-600 font-semibold hover:underline">Log In</a>
+            </div>
+
+            <button onclick="showLanding()" class="w-full mt-4 text-center text-sm text-slate-500 hover:text-slate-700 transition-colors">
+                Back to Home
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN APP DASHBOARD -->
+    <div id="dashboard-page" class="hidden h-full flex overflow-hidden z-10">
+        <!-- Sidebar -->
+        <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0">
+            <!-- Sidebar Header -->
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-6">
+                    <img src="/media/logo.png" alt="Logo" class="h-12 object-contain rounded-lg">
+                    <span class="font-extrabold tracking-tight text-blue-600">
+                        Bot Manager
+                    </span>
+                </div>
+
+                <!-- WhatsApp Status Card -->
+                <div id="status-card" class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] uppercase font-bold tracking-widest text-slate-400">Service Status</div>
+                        <div id="status-label" class="text-sm font-bold mt-0.5 text-yellow-600">Initializing...</div>
+                    </div>
+                    <span id="status-dot" class="w-3.5 h-3.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                </div>
+            </div>
+
+            <!-- Sidebar Navigation -->
+            <nav class="flex-grow px-4 space-y-1.5 overflow-y-auto">
+                <button onclick="switchTab('overview')" id="tab-btn-overview"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 bg-blue-50 text-blue-600 border border-blue-100">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span>Overview</span>
+                </button>
+                <button onclick="switchTab('sender')" id="tab-btn-sender"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
+                    <i data-lucide="send" class="w-5 h-5"></i>
+                    <span>Message Sender</span>
+                </button>
+                <button onclick="switchTab('replies')" id="tab-btn-replies"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
+                    <i data-lucide="bot-message-square" class="w-5 h-5"></i>
+                    <span>Auto-Replies</span>
+                </button>
+                <button onclick="switchTab('scheduler')" id="tab-btn-scheduler"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
+                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                    <span>Message Scheduler</span>
+                </button>
+                <button onclick="switchTab('settings')" id="tab-btn-settings"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    <span>WhatsApp Link</span>
+                </button>
+                <button onclick="switchTab('guide')" id="tab-btn-guide"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
+                    <i data-lucide="book-open" class="w-5 h-5"></i>
+                    <span>Professional Guide</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Footer Profile & Logout -->
+            <div class="p-6 border-t border-slate-200 space-y-4">
+                <div id="profile-container" class="hidden flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-extrabold">
+                        WA
+                    </div>
+                    <div class="overflow-hidden">
+                        <div id="profile-name" class="font-bold text-sm text-slate-700 truncate">WhatsApp Bot</div>
+                        <div id="profile-phone" class="text-xs text-slate-400 truncate">Initializing...</div>
+                    </div>
+                </div>
+                
+                <button onclick="logoutAdmin()" class="w-full py-3 bg-white border border-slate-250 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 text-slate-600">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard View Container -->
+        <main class="flex-grow flex flex-col overflow-hidden">
+            <!-- Topbar Header -->
+            <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
+                <h2 id="current-tab-title" class="text-xl font-bold tracking-tight text-slate-800">Overview</h2>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="text-xs font-semibold text-slate-400">Host Server Online</div>
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.3)]"></span>
+                </div>
+            </header>
+
+            <!-- Tab Panels Content -->
+            <div class="flex-grow overflow-y-auto p-8 space-y-6">
+
+                <!-- 1. OVERVIEW PANEL -->
+                <div id="panel-overview" class="tab-panel space-y-6">
+                    <!-- Stats Section -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="panel-card p-6 rounded-2xl flex items-center space-x-4">
+                            <div class="p-4 bg-blue-50 text-blue-600 rounded-xl">
+                                <i data-lucide="arrow-up-right" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">Messages Sent</div>
+                                <div id="stat-sent" class="text-3xl font-extrabold text-slate-800 mt-1">0</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card p-6 rounded-2xl flex items-center space-x-4">
+                            <div class="p-4 bg-indigo-50 text-indigo-600 rounded-xl">
+                                <i data-lucide="arrow-down-left" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">Messages Received</div>
+                                <div id="stat-received" class="text-3xl font-extrabold text-slate-800 mt-1">0</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card p-6 rounded-2xl flex items-center space-x-4">
+                            <div class="p-4 bg-slate-50 text-slate-600 rounded-xl">
+                                <i data-lucide="clock" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs text-slate-400 font-bold uppercase tracking-wider">Active Uptime</div>
+                                <div id="stat-uptime" class="text-3xl font-extrabold text-slate-800 mt-1">00:00:00</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Console Logs Terminal -->
+                    <div class="panel-card rounded-2xl overflow-hidden flex flex-col h-[480px]">
+                        <div class="px-6 py-4 bg-slate-950 border-b border-slate-900 flex items-center justify-between shrink-0">
+                            <div class="flex items-center space-x-2.5">
+                                <i data-lucide="terminal" class="w-5 h-5 text-blue-400"></i>
+                                <span class="text-sm font-semibold tracking-tight text-slate-200">Live Console Feed</span>
+                            </div>
+                            <button onclick="clearConsole()" class="text-xs text-slate-400 hover:text-white font-medium transition-colors">Clear Console</button>
+                        </div>
+                        <div id="console-logs" class="flex-grow p-6 bg-slate-950 font-mono text-[13px] leading-relaxed overflow-y-auto space-y-1.5 text-slate-300 selection:bg-slate-800">
+                            <!-- Logs will stream here dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. MESSAGE SENDER PANEL -->
+                <div id="panel-sender" class="tab-panel hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- Left side: Senders -->
+                        <div class="lg:col-span-7 space-y-6">
+                            <!-- Individual Sender -->
+                            <div class="panel-card p-6 rounded-2xl space-y-5">
+                                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="user" class="w-5 h-5 text-blue-600"></i> Send Single Message
+                                </h3>
+                                <div class="space-y-4">
+                                    <div class="space-y-1.5">
+                                        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recipient Number (with country code)</label>
+                                        <input type="text" id="sender-single-number" placeholder="e.g. 919876543210"
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm">
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Message Content</label>
+                                        <textarea id="sender-single-message" rows="5" placeholder="Type message to send..."
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm resize-none"></textarea>
+                                    </div>
+                                    <button onclick="sendSingleMessage()"
+                                        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-sm">
+                                        Send Message <i data-lucide="send" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Bulk Sender -->
+                            <div class="panel-card p-6 rounded-2xl space-y-5">
+                                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="users" class="w-5 h-5 text-blue-600"></i> Send Bulk Campaign
+                                </h3>
+                                <div class="space-y-4">
+                                    <!-- Warning Banner -->
+                                    <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                                        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+                                        <div class="text-xs text-amber-800 leading-relaxed font-medium">
+                                            <strong class="font-bold text-amber-950">Warning:</strong> Sending more than 50 messages in a short time frame may cause Meta to block your number. Use a high delay between messages (e.g. 5+ seconds) and divide large lists into smaller batches.
+                                        </div>
+                                    </div>
+                                    <!-- Excel Upload Container -->
+                                    <div class="p-4 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 relative">
+                                        <div class="flex items-center gap-2 text-slate-700 text-sm font-semibold">
+                                            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-600"></i>
+                                            <span>Upload Contacts Excel / CSV</span>
+                                        </div>
+                                        <input type="file" id="bulk-excel-file" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
+                                        <button type="button" onclick="document.getElementById('bulk-excel-file').click()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl text-xs shadow-sm transition-all flex items-center gap-1.5">
+                                            <i data-lucide="upload-cloud" class="w-3.5 h-3.5 text-blue-600"></i> Select Spreadsheet
+                                        </button>
+                                        <div id="excel-file-info" class="text-[11px] text-slate-400 font-medium">Supports .xlsx, .xls, .csv</div>
+                                    </div>
+                                    
+                                    <!-- Variable helper (hidden by default) -->
+                                    <div id="excel-variable-helper" class="hidden p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl space-y-1">
+                                    </div>
+
+                                    <div class="space-y-1.5">
+                                        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recipient Numbers (one per line)</label>
+                                        <textarea id="sender-bulk-numbers" rows="4" placeholder="e.g.&#10;919876543210&#10;919988776655"
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm resize-none font-mono"></textarea>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Campaign Message</label>
+                                        <textarea id="sender-bulk-message" rows="3" placeholder="Type bulk message content..."
+                                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm resize-none"></textarea>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="space-y-1.5">
+                                            <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Delay between (sec)</label>
+                                            <input type="number" id="sender-bulk-delay" value="3" min="1"
+                                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm">
+                                        </div>
+                                    </div>
+
+                                    <!-- Progress indicator -->
+                                    <div id="bulk-progress-container" class="hidden space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                        <div class="flex items-center justify-between text-xs">
+                                            <span class="text-slate-500 font-semibold">Bulk Progress</span>
+                                            <span id="bulk-progress-text" class="text-blue-600 font-bold">0 / 0</span>
+                                        </div>
+                                        <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                            <div id="bulk-progress-bar" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+
+                                    <button id="bulk-send-btn" onclick="startBulkSend()"
+                                        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-sm">
+                                        Launch Campaign <i data-lucide="play" class="w-4 h-4"></i>
+                                    </button>
+
+                                    <!-- Campaign Delivery Report (hidden by default) -->
+                                    <div id="bulk-report-container" class="hidden space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-xl mt-4">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs text-slate-500 font-bold uppercase tracking-wider">Campaign Report</span>
+                                            <button onclick="clearBulkReport()" class="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Clear</button>
+                                        </div>
+                                        <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+                                            <table class="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr class="border-b border-slate-150 text-[10px] uppercase tracking-wider font-bold text-slate-400 bg-slate-50">
+                                                        <th class="py-2 px-3">Recipient</th>
+                                                        <th class="py-2 px-3">Status</th>
+                                                        <th class="py-2 px-3">Details</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="bulk-report-list" class="text-[11px] divide-y divide-slate-100 font-medium">
+                                                    <!-- Dynamic Campaign Logs -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right side: Quick-Reply Templates -->
+                        <div class="lg:col-span-5 panel-card p-6 rounded-2xl flex flex-col justify-between space-y-5 h-fit">
+                            <div class="space-y-5">
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <i data-lucide="clipboard-list" class="w-5 h-5 text-blue-600"></i> Quick-Replies
+                                    </h3>
+                                    <button onclick="openAddTemplateModal()" class="text-xs px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-lg transition-colors flex items-center gap-1">
+                                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> New
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-400 font-medium leading-relaxed">Click any template card below to automatically load its contents into both the single and bulk message boxes.</p>
+                                
+                                <!-- Templates Container -->
+                                <div id="templates-list-container" class="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                                    <!-- Dynamic Template Cards -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. AUTO REPLIES PANEL -->
+                <div id="panel-replies" class="tab-panel hidden space-y-6">
+                    <div class="panel-card p-6 rounded-2xl space-y-6">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800">Configure Auto-Replies</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Map incoming triggers to automatic chat replies.</p>
+                            </div>
+                            <button onclick="openAddReplyModal()"
+                                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all duration-300 flex items-center gap-2 shadow-md">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Add Rule
+                            </button>
+                        </div>
+
+                        <!-- Replies List Table -->
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl bg-slate-50">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider font-bold text-slate-400">
+                                        <th class="py-4 px-6">Trigger Keyword</th>
+                                        <th class="py-4 px-6">Auto-Reply Text</th>
+                                        <th class="py-4 px-6 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auto-replies-list" class="text-sm divide-y divide-slate-200">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3.5. MESSAGE SCHEDULER PANEL -->
+                <div id="panel-scheduler" class="tab-panel hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Scheduler Form -->
+                        <div class="panel-card p-6 rounded-2xl space-y-5 lg:col-span-1">
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="calendar" class="w-5 h-5 text-blue-600"></i> Schedule Message
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recipient Number</label>
+                                    <input type="text" id="schedule-number" placeholder="e.g. 919876543210"
+                                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Scheduled Date & Time</label>
+                                    <input type="datetime-local" id="schedule-time"
+                                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Message</label>
+                                    <textarea id="schedule-message" rows="4" placeholder="What message would you like to schedule?"
+                                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm resize-none"></textarea>
+                                </div>
+                                <button onclick="saveScheduledMessage()"
+                                    class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 text-sm">
+                                    Schedule Send <i data-lucide="clock" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Scheduled List -->
+                        <div class="panel-card p-6 rounded-2xl space-y-5 lg:col-span-2">
+                            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <i data-lucide="list-todo" class="w-5 h-5 text-blue-600"></i> Scheduled Queue
+                            </h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-xl bg-slate-50">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider font-bold text-slate-400">
+                                            <th class="py-4 px-4">Recipient</th>
+                                            <th class="py-4 px-4">Message</th>
+                                            <th class="py-4 px-4">Schedule Time</th>
+                                            <th class="py-4 px-4">Status</th>
+                                            <th class="py-4 px-4 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="scheduled-list" class="text-xs divide-y divide-slate-200">
+                                        <!-- Dynamic Rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. LINK SETTINGS PANEL (QR) -->
+                <div id="panel-settings" class="tab-panel hidden space-y-6">
+                    <div class="max-w-xl mx-auto panel-card p-8 rounded-3xl text-center space-y-8 relative overflow-hidden">
+                        <!-- QR Setup View -->
+                        <div id="qr-setup-view" class="space-y-6">
+                            <div class="space-y-2">
+                                <h3 class="text-2xl font-bold text-slate-800 tracking-tight">Connect WhatsApp Session</h3>
+                                <p class="text-sm text-slate-500">Scan the QR code below using your phone's WhatsApp linked devices.</p>
+                            </div>
+                            
+                            <!-- QR Container -->
+                            <div class="w-64 h-64 mx-auto bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-center relative overflow-hidden p-4">
+                                <div id="qr-spinner" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/90 gap-3">
+                                    <div class="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                                    <span class="text-xs text-slate-500 font-semibold">Generating QR Code...</span>
+                                </div>
+                                <img id="qr-image" src="" alt="WhatsApp QR Code" class="hidden w-full h-full object-contain rounded-2xl">
+                            </div>
+
+                            <div class="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                                <i data-lucide="info" class="w-4 h-4 text-blue-600"></i> Open WhatsApp > Linked Devices > Link a Device
+                            </div>
+                        </div>
+
+                        <!-- QR Connected View -->
+                        <div id="qr-connected-view" class="hidden py-6 space-y-6">
+                            <div class="w-20 h-20 mx-auto rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+                                <i data-lucide="check" class="w-10 h-10 text-blue-600"></i>
+                            </div>
+                            <div class="space-y-2">
+                                <h3 class="text-2xl font-bold text-slate-800 tracking-tight">WhatsApp Connected</h3>
+                                <p class="text-sm text-slate-500">Your bot is active and listening for messages.</p>
+                            </div>
+                            
+                            <div id="settings-profile-card" class="p-5 max-w-sm mx-auto rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center gap-3">
+                                <div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                                    WA
+                                </div>
+                                <div>
+                                    <div id="settings-profile-name" class="font-bold text-slate-700">Main Account</div>
+                                    <div id="settings-profile-phone" class="text-xs text-slate-400 mt-0.5">Initializing...</div>
+                                </div>
+                            </div>
+
+                            <button onclick="disconnectSession()"
+                                class="px-6 py-3 border border-rose-200 hover:bg-rose-50 hover:text-rose-600 text-rose-500 font-bold rounded-xl text-sm transition-all duration-300 flex items-center justify-center gap-2 mx-auto">
+                                <i data-lucide="unlink" class="w-4 h-4"></i> Disconnect Session
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. PROFESSIONAL GUIDE PANEL -->
+                <div id="panel-guide" class="tab-panel hidden space-y-6">
+                    <div class="panel-card p-8 rounded-3xl space-y-6 bg-white border border-slate-200">
+                        <div class="flex items-center gap-3 border-b border-slate-100 pb-5">
+                            <div class="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+                                <i data-lucide="award" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-800">Professional WhatsApp Sender Guide</h3>
+                                <p class="text-xs text-slate-500">Industry standards and anti-ban principles to run secure, reliable, and compliant campaigns.</p>
+                            </div>
+                        </div>
+
+                        <!-- Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            <!-- Section 1: Avoiding Meta Spam Bans -->
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i> Anti-Ban Campaign Rules
+                                </h4>
+                                <ul class="space-y-3 text-xs text-slate-600 font-medium">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Keep Batches Under 50:</strong> Split bulk campaigns into segments of 30-50 contacts. Sending 100+ messages instantly triggers automated spam detection.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Set High Delay Values:</strong> Use a delay of at least 5 to 10 seconds between scheduled messages to simulate normal human typing speed.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Personalize Message Text:</strong> Include variables like client names or order numbers. Identical broadcast text sent to dozens of numbers is instantly flagged by Meta's AI algorithms.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Section 2: Opt-In & Customer Etiquette -->
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="message-square-heart" class="w-4 h-4 text-blue-500"></i> Trust & Compliance Guidelines
+                                </h4>
+                                <ul class="space-y-3 text-xs text-slate-600 font-medium">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Prioritize Consent (Opt-in):</strong> Only send messages to clients who have explicitly signed up, ordered, or requested details via your site or business page.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Clear Opt-out Signature:</strong> Always offer an easy exit in initial outreach (e.g., <em>"Reply 'STOP' to opt out"</em>). If users report/block your chat, Meta will lock your number.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Avoid Cold Broadcasts:</strong> Sending sales messages to cold lists (unknown numbers) will result in immediate user reports, which is the #1 cause of number blocks.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Section 3: Smart Auto-Replies & Canned Messages -->
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i> Automations Best Practices
+                                </h4>
+                                <ul class="space-y-3 text-xs text-slate-600 font-medium">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Short trigger keywords:</strong> Set simple triggers (e.g., 'address', 'price', 'hours') rather than full sentences, making it easier for customers to auto-trigger responses.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Maintain Canned Responses:</strong> Keep payment details, physical addresses, and standard refund/return text pre-loaded in "Quick-Replies" to speed up agent workflows.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Hybrid Interaction:</strong> Keep an eye on incoming logs in the Overview console to step in manually if the bot is unable to resolve a complex inquiry.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <!-- Section 4: Secure Link & Maintenance -->
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                                <h4 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                    <i data-lucide="activity" class="w-4 h-4 text-emerald-500"></i> Operational Maintenance
+                                </h4>
+                                <ul class="space-y-3 text-xs text-slate-600 font-medium">
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Persistent Session Caching:</strong> The system automatically caches session data, keeping you logged in even after browser closures or backend server restarts.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Graceful Logout:</strong> Always use the "Disconnect Session" button in Settings if switching phone lines, ensuring WhatsApp registers the logout correctly.</span>
+                                    </li>
+                                    <li class="flex items-start gap-2">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5"></i>
+                                        <span><strong>Monitor Server Status:</strong> Check the status indicator dot in the sidebar (Green = Connected, Yellow = Initializing, Red = Disconnected) for quick diagnostics.</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <!-- Add Reply Modal -->
+    <div id="reply-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+        <div class="w-full max-w-lg p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-6">
+            <h3 id="modal-reply-title" class="text-xl font-bold text-slate-800 tracking-tight">Add Auto-Reply Trigger</h3>
+            
+            <div class="space-y-4">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Trigger Phrase (case-insensitive)</label>
+                    <input type="text" id="modal-reply-keyword" placeholder="e.g. hi"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-850 transition-all text-sm">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Response Text</label>
+                    <textarea id="modal-reply-text" rows="4" placeholder="What should the bot reply?"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-850 transition-all text-sm resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mt-4">
+                <button onclick="closeAddReplyModal()" class="px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-55 transition-all text-slate-600">Cancel</button>
+                <button onclick="saveAutoReply()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all duration-300">Save Rule</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Template Modal -->
+    <div id="template-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-6">
+        <div class="w-full max-w-lg p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-6">
+            <h3 id="modal-template-title" class="text-xl font-bold text-slate-800 tracking-tight">Add Quick-Reply Template</h3>
+            
+            <div class="space-y-4">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-550 uppercase tracking-wider">Template Name</label>
+                    <input type="text" id="modal-template-name" placeholder="e.g. Office Location"
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold text-slate-550 uppercase tracking-wider">Template Content</label>
+                    <textarea id="modal-template-content" rows="5" placeholder="Type standard message content..."
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 outline-none text-slate-800 transition-all text-sm resize-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 mt-4">
+                <button onclick="closeAddTemplateModal()" class="px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-55 transition-all text-slate-600">Cancel</button>
+                <button onclick="saveTemplate()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all duration-300">Save Template</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Application Logic Script -->
+    <script src="/app.js"></script>
+
+    <!-- Landing Page Dynamic Interactive Mockup Script -->
+    <script>
+        let t = 0;
+        setInterval(() => {
+            const landingPage = document.getElementById('landing-page');
+            // Check if landing page is currently active (not hidden)
+            if (landingPage && !landingPage.classList.contains('hidden')) {
+                t += 0.05;
+                const scrollY = window.scrollY;
+                
+                const campaignsVal = document.getElementById('mock-campaigns-val');
+                const templatesVal = document.getElementById('mock-templates-val');
+                const sentVal = document.getElementById('mock-sent-val');
+                const receivedVal = document.getElementById('mock-received-val');
+                const radialText = document.getElementById('mock-radial-text');
+                const radialCircle = document.getElementById('mock-radial-circle');
+                const sparkline = document.getElementById('mock-sparkline-1');
+                
+                if (campaignsVal) {
+                    // Combine steady time drift with scroll position to animate values organically
+                    const campaigns = Math.floor(23 + (Math.sin(t) * 3) + ((scrollY / 40) % 4));
+                    const templates = Math.floor(56 + (Math.cos(t) * 2) + ((scrollY / 60) % 3));
+                    const sent = Math.floor(1248 + (t * 8) + (scrollY / 1.5));
+                    const received = Math.floor(968 + (t * 6) + (scrollY / 2.2));
+                    const radialPercent = Math.floor(82 + (Math.sin(t * 1.5) * 4) + ((scrollY / 50) % 5));
+                    
+                    campaignsVal.textContent = campaigns;
+                    templatesVal.textContent = templates;
+                    sentVal.textContent = Math.floor(sent).toLocaleString();
+                    receivedVal.textContent = Math.floor(received).toLocaleString();
+                    
+                    if (radialText) radialText.textContent = `${radialPercent}%`;
+                    if (radialCircle) radialCircle.setAttribute('stroke-dasharray', `${radialPercent}, 100`);
+                    
+                    // Animate SVG line wave dynamically
+                    if (sparkline) {
+                        const offset1 = Math.sin(t * 2 + scrollY / 30) * 8;
+                        const offset2 = Math.cos(t * 1.5 + scrollY / 45) * 6;
+                        const offset3 = Math.sin(t * 3 + scrollY / 60) * 7;
+                        const offset4 = Math.cos(t * 2.5 + scrollY / 75) * 8;
+                        sparkline.setAttribute('d', `M 0 25 L 20 ${18 + offset1} L 40 ${22 + offset2} L 60 ${10 + offset3} L 80 ${15 + offset4} L 100 5`);
+                    }
+                }
+            }
+        }, 80);
+    </script>
+</body>
+</html>

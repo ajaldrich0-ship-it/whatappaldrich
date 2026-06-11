@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp messaging bot using whatsapp-web.js",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start-cli": "node src/index.js",
+    "send": "node src/send-message.js",
+    "bulk": "node src/bulk-sender.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.3",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}

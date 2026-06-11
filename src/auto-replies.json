@@ -1,0 +1,7 @@
+{
+  "hi": "Hello! 👋 How can I help you?",
+  "hello": "Hi there! 😊 How can I help you?",
+  "help": "Available commands:\n- *hi* → greeting\n- *help* → show this menu\n- *time* → current time\n- *ping* → pong!",
+  "ping": "Pong! 🏓",
+  "time": "Current time: [dynamic_time]"
+}
