@@ -554,6 +554,17 @@ app.delete('/api/templates/:id', requireAuth, (req, res) => {
 
 
 
+// Authenticate socket connection
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (token === AUTH_SECRET) {
+    next();
+  } else {
+    console.log('Unauthorized socket connection attempt rejected');
+    next(new Error('Unauthorized'));
+  }
+});
+
 // Socket.io connection listener
 io.on('connection', (socket) => {
   console.log('Client dashboard connected via socket');
@@ -564,8 +575,32 @@ io.on('connection', (socket) => {
   socket.emit('templates_updated', templates);
 });
 
-// Start WhatsApp Client
-initializeWhatsApp();
+// Connect/Initialize WhatsApp manually
+app.post('/api/connect', requireAuth, (req, res) => {
+  if (clientStatus !== 'DISCONNECTED') {
+    return res.json({ success: true, message: 'WhatsApp client is already active or initializing.' });
+  }
+  initializeWhatsApp();
+  res.json({ success: true });
+});
+
+// Auto-restore session on boot only if session files exist
+const sessionDir = path.join(__dirname, '../session');
+let hasSession = false;
+try {
+  if (fs.existsSync(sessionDir) && fs.readdirSync(sessionDir).length > 0) {
+    hasSession = true;
+  }
+} catch (err) {
+  // ignore
+}
+
+if (hasSession) {
+  logToSystem('Saved session cache found. Auto-connecting WhatsApp...', 'info');
+  initializeWhatsApp();
+} else {
+  logToSystem('No saved session. Open Settings (WhatsApp Link) in the dashboard to generate a QR code.', 'info');
+}
 
 // Serve the index.html on root route
 app.get('/', (req, res) => {

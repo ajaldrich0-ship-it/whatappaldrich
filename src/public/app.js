@@ -1,6 +1,6 @@
 // Real-time WhatsApp Bot Manager Application Script
 
-const socket = io();
+let socket = null;
 
 // Application State
 let authToken = localStorage.getItem('auth_token') || null;
@@ -61,6 +61,7 @@ function showDashboard() {
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('signup-page').classList.add('hidden');
   document.getElementById('dashboard-page').classList.remove('hidden');
+  initSocket();
   updateIcons();
   loadAutoReplies();
   loadScheduledMessages();
@@ -149,6 +150,7 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
 function logoutAdmin() {
   authToken = null;
   localStorage.removeItem('auth_token');
+  disconnectSocket();
   stopUptimeCounter();
   showLanding();
 }
@@ -676,118 +678,143 @@ async function disconnectSession() {
   }
 }
 
-// ─── SOCKET.IO EVENT HANDLERS ──────────────────────────────────────
+// ─── SOCKET.IO CONNECTION MANAGEMENT ────────────────────────────────
 
-socket.on('initial_logs', (logs) => {
-  clearConsole();
-  logs.forEach(log => appendLog(log));
-});
+function initSocket() {
+  if (socket) return;
+  
+  socket = io({
+    auth: {
+      token: authToken
+    }
+  });
 
-socket.on('log', (logEntry) => {
-  appendLog(logEntry);
-});
+  socket.on('initial_logs', (logs) => {
+    clearConsole();
+    logs.forEach(log => appendLog(log));
+  });
 
-// Real-time WhatsApp Client Status Handler
-socket.on('status', (data) => {
-  const statusLabel = document.getElementById('status-label');
-  const statusDot = document.getElementById('status-dot');
-  
-  const qrSetupView = document.getElementById('qr-setup-view');
-  const qrConnectedView = document.getElementById('qr-connected-view');
-  
-  // Set styling depending on status
-  statusDot.classList.remove('bg-yellow-400', 'bg-emerald-400', 'bg-rose-500', 'animate-pulse');
-  statusDot.style.boxShadow = 'none';
-  
-  if (data.status === 'DISCONNECTED') {
-    statusLabel.textContent = 'Offline';
-    statusLabel.className = 'text-sm font-bold mt-0.5 text-rose-600';
-    statusDot.classList.add('bg-rose-500');
+  socket.on('log', (logEntry) => {
+    appendLog(logEntry);
+  });
+
+  socket.on('status', (data) => {
+    const statusLabel = document.getElementById('status-label');
+    const statusDot = document.getElementById('status-dot');
     
-    qrSetupView.classList.remove('hidden');
-    qrConnectedView.classList.add('hidden');
+    const qrSetupView = document.getElementById('qr-setup-view');
+    const qrConnectedView = document.getElementById('qr-connected-view');
     
-    // Show spinner in QR wrapper
-    document.getElementById('qr-spinner').classList.remove('hidden');
-    document.getElementById('qr-image').classList.add('hidden');
-    
-    document.getElementById('profile-container').classList.add('hidden');
-  } 
-  else if (data.status === 'INITIALIZING') {
-    statusLabel.textContent = 'Initializing...';
-    statusLabel.className = 'text-sm font-bold mt-0.5 text-yellow-400';
-    statusDot.classList.add('bg-yellow-400', 'animate-pulse');
-    statusDot.style.boxShadow = '0 0 10px rgba(250,204,21,0.4)';
-    
-    qrSetupView.classList.remove('hidden');
-    qrConnectedView.classList.add('hidden');
-    
-    document.getElementById('qr-spinner').classList.remove('hidden');
-    document.getElementById('qr-image').classList.add('hidden');
-    
-    document.getElementById('profile-container').classList.add('hidden');
-  } 
-  else if (data.status === 'QR_READY') {
-    statusLabel.textContent = 'Scan QR Code';
-    statusLabel.className = 'text-sm font-bold mt-0.5 text-yellow-400';
-    statusDot.classList.add('bg-yellow-400', 'animate-pulse');
-    statusDot.style.boxShadow = '0 0 10px rgba(250,204,21,0.4)';
-    
-    qrSetupView.classList.remove('hidden');
-    qrConnectedView.classList.add('hidden');
-    
-    document.getElementById('profile-container').classList.add('hidden');
-  } 
-  else if (data.status === 'CONNECTED') {
-    statusLabel.textContent = 'Connected';
-    statusLabel.className = 'text-sm font-bold mt-0.5 text-emerald-600';
-    statusDot.classList.add('bg-emerald-500');
+    // Set styling depending on status
+    statusDot.classList.remove('bg-yellow-400', 'bg-emerald-400', 'bg-rose-500', 'animate-pulse');
     statusDot.style.boxShadow = 'none';
     
-    qrSetupView.classList.add('hidden');
-    qrConnectedView.classList.remove('hidden');
-    
-    // Update profile info
-    if (data.profile) {
-      document.getElementById('profile-container').classList.remove('hidden');
-      document.getElementById('profile-name').textContent = data.profile.name;
-      document.getElementById('profile-phone').textContent = `+${data.profile.number}`;
+    if (data.status === 'DISCONNECTED') {
+      statusLabel.textContent = 'Offline';
+      statusLabel.className = 'text-sm font-bold mt-0.5 text-rose-600';
+      statusDot.classList.add('bg-rose-500');
       
-      document.getElementById('settings-profile-name').textContent = data.profile.name;
-      document.getElementById('settings-profile-phone').textContent = `+${data.profile.number}`;
+      qrSetupView.classList.remove('hidden');
+      qrConnectedView.classList.add('hidden');
+      
+      // Show spinner in QR wrapper
+      document.getElementById('qr-spinner').classList.remove('hidden');
+      document.getElementById('qr-image').classList.add('hidden');
+      
+      document.getElementById('profile-container').classList.add('hidden');
+    } 
+    else if (data.status === 'INITIALIZING') {
+      statusLabel.textContent = 'Initializing...';
+      statusLabel.className = 'text-sm font-bold mt-0.5 text-yellow-400';
+      statusDot.classList.add('bg-yellow-400', 'animate-pulse');
+      statusDot.style.boxShadow = '0 0 10px rgba(250,204,21,0.4)';
+      
+      qrSetupView.classList.remove('hidden');
+      qrConnectedView.classList.add('hidden');
+      
+      document.getElementById('qr-spinner').classList.remove('hidden');
+      document.getElementById('qr-image').classList.add('hidden');
+      
+      document.getElementById('profile-container').classList.add('hidden');
+    } 
+    else if (data.status === 'QR_READY') {
+      statusLabel.textContent = 'Scan QR Code';
+      statusLabel.className = 'text-sm font-bold mt-0.5 text-yellow-400';
+      statusDot.classList.add('bg-yellow-400', 'animate-pulse');
+      statusDot.style.boxShadow = '0 0 10px rgba(250,204,21,0.4)';
+      
+      qrSetupView.classList.remove('hidden');
+      qrConnectedView.classList.add('hidden');
+      
+      document.getElementById('profile-container').classList.add('hidden');
+    } 
+    else if (data.status === 'CONNECTED') {
+      statusLabel.textContent = 'Connected';
+      statusLabel.className = 'text-sm font-bold mt-0.5 text-emerald-600';
+      statusDot.classList.add('bg-emerald-500');
+      statusDot.style.boxShadow = 'none';
+      
+      qrSetupView.classList.add('hidden');
+      qrConnectedView.classList.remove('hidden');
+      
+      // Update profile info
+      if (data.profile) {
+        document.getElementById('profile-container').classList.remove('hidden');
+        document.getElementById('profile-name').textContent = data.profile.name;
+        document.getElementById('profile-phone').textContent = `+${data.profile.number}`;
+        
+        document.getElementById('settings-profile-name').textContent = data.profile.name;
+        document.getElementById('settings-profile-phone').textContent = `+${data.profile.number}`;
+      }
     }
-  }
-});
+  });
 
-// Receive QR code from socket
-socket.on('qr', (data) => {
-  const qrImage = document.getElementById('qr-image');
-  const qrSpinner = document.getElementById('qr-spinner');
-  
-  if (data.qr) {
-    // Render using QR Server API
-    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data.qr)}`;
+  socket.on('qr', (data) => {
+    const qrImage = document.getElementById('qr-image');
+    const qrSpinner = document.getElementById('qr-spinner');
     
-    qrImage.onload = () => {
-      qrSpinner.classList.add('hidden');
-      qrImage.classList.remove('hidden');
-    };
+    if (data.qr) {
+      // Render using QR Server API
+      qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data.qr)}`;
+      
+      qrImage.onload = () => {
+        qrSpinner.classList.add('hidden');
+        qrImage.classList.remove('hidden');
+      };
+    }
+  });
+
+  socket.on('message_sent', (msg) => {
+    totalSent++;
+    document.getElementById('stat-sent').textContent = totalSent;
+  });
+
+  socket.on('message_received', (msg) => {
+    totalReceived++;
+    document.getElementById('stat-received').textContent = totalReceived;
+  });
+
+  socket.on('scheduled_updated', (data) => {
+    scheduledMessages = data;
+    renderScheduledTable();
+  });
+
+  socket.on('templates_updated', (data) => {
+    templates = data;
+    renderTemplatesList();
+  });
+}
+
+function disconnectSocket() {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
   }
-});
+}
 
 // Update dynamic stats
 let totalSent = 0;
 let totalReceived = 0;
-
-socket.on('message_sent', (msg) => {
-  totalSent++;
-  document.getElementById('stat-sent').textContent = totalSent;
-});
-
-socket.on('message_received', (msg) => {
-  totalReceived++;
-  document.getElementById('stat-received').textContent = totalReceived;
-});
 
 // ─── MESSAGE SCHEDULER FRONTEND ──────────────────────────────────
 let scheduledMessages = [];
@@ -901,10 +928,7 @@ async function cancelScheduledMessage(id) {
   }
 }
 
-socket.on('scheduled_updated', (data) => {
-  scheduledMessages = data;
-  renderScheduledTable();
-});
+// Socket listener replaced by connection management function initSocket()
 
 // ─── QUICK TEMPLATES FRONTEND ────────────────────────────────────
 let templates = [];
@@ -1061,10 +1085,7 @@ function useTemplate(id, event) {
   }, 300);
 }
 
-socket.on('templates_updated', (data) => {
-  templates = data;
-  renderTemplatesList();
-});
+// Socket listener replaced by connection management function initSocket()
 
 // ─── INITIALIZATION ───────────────────────────────────────────────
 
