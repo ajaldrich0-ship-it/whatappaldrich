@@ -848,6 +848,41 @@ async function initializeWhatsAppConnection() {
   }
 }
 
+async function recreateQRCode() {
+  if (!confirm('Are you sure you want to recreate the QR code? This will reset the current connection attempt.')) {
+    return;
+  }
+  
+  const btn = document.querySelector('#qr-code-wrapper button');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-slate-400/20 border-t-slate-500 rounded-full animate-spin"></div> Recreating...';
+  }
+  
+  try {
+    // 1. Terminate/Logout current client and clear cache
+    await fetch('/api/logout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    
+    // 2. Connect again to trigger a fresh QR code
+    await fetch('/api/connect', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+  } catch (err) {
+    console.error(err);
+    alert('Error recreating QR code.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Recreate QR Code';
+      updateIcons();
+    }
+  }
+}
+
 // Update dynamic stats
 let totalSent = 0;
 let totalReceived = 0;
