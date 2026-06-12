@@ -772,10 +772,13 @@ function initSocket() {
       document.getElementById('qr-spinner').classList.remove('hidden');
       document.getElementById('qr-image').classList.add('hidden');
       
+      const pairingDisplay = document.getElementById('pairing-code-display');
+      if (pairingDisplay) pairingDisplay.classList.add('hidden');
+      
       document.getElementById('profile-container').classList.add('hidden');
     } 
     else if (data.status === 'QR_READY') {
-      statusLabel.textContent = 'Scan QR Code';
+      statusLabel.textContent = data.pairingActive ? 'Pairing Code Ready' : 'Scan QR Code';
       statusLabel.className = 'text-sm font-bold mt-0.5 text-yellow-400';
       statusDot.classList.add('bg-yellow-400', 'animate-pulse');
       statusDot.style.boxShadow = '0 0 10px rgba(250,204,21,0.4)';
@@ -783,9 +786,15 @@ function initSocket() {
       qrSetupView.classList.remove('hidden');
       qrConnectedView.classList.add('hidden');
       
-      // Hide start connection, show qr wrapper
       document.getElementById('start-connection-container').classList.add('hidden');
-      document.getElementById('qr-code-wrapper').classList.remove('hidden');
+      
+      if (data.pairingActive) {
+        document.getElementById('qr-code-wrapper').classList.add('hidden');
+        document.getElementById('pairing-code-display').classList.remove('hidden');
+      } else {
+        document.getElementById('qr-code-wrapper').classList.remove('hidden');
+        document.getElementById('pairing-code-display').classList.add('hidden');
+      }
       
       document.getElementById('profile-container').classList.add('hidden');
     } 
