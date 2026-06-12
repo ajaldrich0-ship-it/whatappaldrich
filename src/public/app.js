@@ -9,6 +9,7 @@ let autoReplies = {};
 let bulkCampaignRunning = false;
 let currentUptimeSeconds = 0;
 let uptimeTimer = null;
+let automations = [];
 
 // Initialize Lucide Icons
 function updateIcons() {
@@ -66,6 +67,9 @@ function showDashboard() {
   loadAutoReplies();
   loadScheduledMessages();
   loadTemplates();
+  loadContacts();
+  loadAutomations();
+  loadSequences();
   startUptimeCounter();
 }
 
@@ -182,10 +186,23 @@ function switchTab(tabName) {
     sender: 'Send Messages',
     replies: 'Auto-Replies Setup',
     scheduler: 'Message Scheduler',
+    contacts: 'Contact Segments Directory',
+    automations: 'Workflow Automations & Rules',
     settings: 'WhatsApp Connection Status',
     guide: 'Professional Senders Guide'
   };
   document.getElementById('current-tab-title').textContent = titles[tabName] || 'Dashboard';
+  
+  // Auto-close mobile sidebar drawer on small screens
+  if (window.innerWidth < 1024) {
+    const sidebar = document.getElementById('sidebar-menu');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) {
+      sidebar.classList.add('hidden');
+      sidebar.classList.remove('flex');
+    }
+    if (backdrop) backdrop.classList.add('hidden');
+  }
   
   updateIcons();
 }
@@ -698,6 +715,17 @@ function initSocket() {
     appendLog(logEntry);
   });
 
+  socket.on('pairing_code', (data) => {
+    const pairingDisplay = document.getElementById('pairing-code-display');
+    const pairingVal = document.getElementById('pairing-code-val');
+    const qrWrapper = document.getElementById('qr-code-wrapper');
+    if (data.code) {
+      pairingVal.textContent = data.code.split('').join(' ');
+      if (pairingDisplay) pairingDisplay.classList.remove('hidden');
+      if (qrWrapper) qrWrapper.classList.add('hidden');
+    }
+  });
+
   socket.on('status', (data) => {
     const statusLabel = document.getElementById('status-label');
     const statusDot = document.getElementById('status-dot');
@@ -722,6 +750,10 @@ function initSocket() {
       document.getElementById('qr-code-wrapper').classList.add('hidden');
       
       document.getElementById('profile-container').classList.add('hidden');
+      
+      // Hide pairing code display on disconnect
+      const pairingDisplay = document.getElementById('pairing-code-display');
+      if (pairingDisplay) pairingDisplay.classList.add('hidden');
     } 
     else if (data.status === 'INITIALIZING') {
       statusLabel.textContent = 'Initializing...';
@@ -773,6 +805,10 @@ function initSocket() {
         document.getElementById('settings-profile-name').textContent = data.profile.name;
         document.getElementById('settings-profile-phone').textContent = `+${data.profile.number}`;
       }
+      
+      // Hide pairing code display when connected
+      const pairingDisplay = document.getElementById('pairing-code-display');
+      if (pairingDisplay) pairingDisplay.classList.add('hidden');
     }
   });
 
@@ -809,6 +845,23 @@ function initSocket() {
   socket.on('templates_updated', (data) => {
     templates = data;
     renderTemplatesList();
+  });
+
+  socket.on('contacts_updated', (data) => {
+    contacts = data;
+    renderContactsList();
+    populateTagDropdowns();
+  });
+
+  socket.on('automations_updated', (data) => {
+    automations = data;
+    renderAutomationsList();
+    populateSequenceTagDropdown();
+  });
+
+  socket.on('sequences_updated', (data) => {
+    sequences = data;
+    renderSequencesList();
   });
 }
 
@@ -935,6 +988,7 @@ function renderScheduledTable() {
       <td class="py-4 px-4 font-semibold text-slate-700">${escapeHtml(msg.number)}</td>
       <td class="py-4 px-4 text-slate-600 max-w-xs truncate" title="${escapeHtml(msg.message)}">${escapeHtml(msg.message)}</td>
       <td class="py-4 px-4 text-slate-500">${formattedDate}</td>
+      <td class="py-4 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${msg.recurrence && msg.recurrence !== 'NONE' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-100 text-slate-500'}">${escapeHtml(msg.recurrence || 'ONE-TIME')}</span></td>
       <td class="py-4 px-4">${statusBadge}</td>
       <td class="py-4 px-4 text-right">
         ${msg.status === 'PENDING' ? `<button onclick="cancelScheduledMessage('${msg.id}')" class="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors">Cancel</button>` : '<span class="text-slate-400">-</span>'}
@@ -949,6 +1003,8 @@ async function saveScheduledMessage() {
   const time = document.getElementById('schedule-time').value;
   const message = document.getElementById('schedule-message').value.trim();
   
+  const recurrence = document.getElementById('schedule-recurrence').value;
+  
   if (!number || !time || !message) {
     alert('Please fill out all fields (number, time, and message).');
     return;
@@ -961,7 +1017,7 @@ async function saveScheduledMessage() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: JSON.stringify({ number, message, scheduledTime: new Date(time).toISOString() })
+      body: JSON.stringify({ number, message, recurrence, scheduledTime: new Date(time).toISOString() })
     });
     
     if (res.ok) {
@@ -1158,11 +1214,952 @@ function useTemplate(id, event) {
   }, 300);
 }
 
-// Socket listener replaced by connection management function initSocket()
+async function sendQuickDirectMessage() {
+  const phoneEl = document.getElementById('quick-chat-phone');
+  const msgEl = document.getElementById('quick-chat-message');
+  
+  const number = phoneEl.value.trim();
+  const message = msgEl.value.trim();
+  
+  if (!number || !message) {
+    alert('Please enter a phone number and message contents.');
+    return;
+  }
+  
+  const btn = document.querySelector('#panel-overview button');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> Sending...';
+  }
+  
+  try {
+    const res = await fetch('/api/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ number, message })
+    });
+    
+    if (res.ok) {
+      alert('Quick message sent successfully!');
+      msgEl.value = '';
+    } else {
+      const err = await res.json();
+      alert(`Error sending: ${err.error}`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Network error sending message.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'Send Message <i data-lucide="send" class="w-3.5 h-3.5"></i>';
+      updateIcons();
+    }
+  }
+}
+
+function generateWaMeLink() {
+  const number = document.getElementById('quick-chat-phone').value.trim().replace(/\D/g, '');
+  if (!number) {
+    alert('Please enter a phone number first.');
+    return;
+  }
+  window.open(`https://wa.me/${number}`, '_blank');
+}
+
+// ─── CONTACT SEGMENTS DIRECTORY ──────────────────────────────────
+let contacts = [];
+
+async function loadContacts() {
+  try {
+    const res = await fetch('/api/contacts', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (res.ok) {
+      contacts = await res.json();
+      renderContactsList();
+      populateTagDropdowns();
+    }
+  } catch (err) {
+    console.error('Error loading contacts:', err);
+  }
+}
+
+function renderContactsList(filteredList = null) {
+  const listToRender = filteredList || contacts;
+  const tbody = document.getElementById('contacts-list');
+  tbody.innerHTML = '';
+
+  if (listToRender.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-500 italic">No contacts found.</td></tr>`;
+    return;
+  }
+
+  listToRender.forEach(c => {
+    const row = document.createElement('tr');
+    row.className = 'border-b border-slate-200 hover:bg-slate-50 transition-colors';
+
+    const tagsHtml = c.tags && c.tags.length > 0
+      ? c.tags.map(t => `<span class="px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 text-[10px] uppercase font-bold mr-1">${escapeHtml(t)}</span>`).join('')
+      : '<span class="text-slate-400 italic text-[10px]">No Tags</span>';
+
+    // Premium CRM Badges
+    const badges = [];
+    if (c.birthday) badges.push(`<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] cursor-help font-bold mr-1" title="Birthday: ${c.birthday}">🎂 BDAY</span>`);
+    if (c.anniversary) badges.push(`<span class="px-1.5 py-0.5 rounded bg-pink-50 text-pink-650 border border-pink-100 text-[10px] cursor-help font-bold mr-1" title="Anniversary: ${c.anniversary}">💖 ANIV</span>`);
+    if (c.paymentDate) badges.push(`<span class="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100 text-[10px] cursor-help font-bold mr-1" title="Payment: ${c.paymentDate}">💵 PMNT</span>`);
+    if (c.appointmentDate) badges.push(`<span class="px-1.5 py-0.5 rounded bg-purple-50 text-purple-650 border border-purple-100 text-[10px] cursor-help font-bold mr-1" title="Appointment: ${c.appointmentDate.replace('T', ' ')}">🗓️ APPT</span>`);
+    const badgesHtml = badges.length > 0 ? `<div class="flex flex-wrap gap-1 mt-1">${badges.join('')}</div>` : '';
+
+    row.innerHTML = `
+      <td class="py-4 px-4 font-semibold text-slate-700">${escapeHtml(c.name)}</td>
+      <td class="py-4 px-4 text-slate-600 font-mono">${escapeHtml(c.phone)}</td>
+      <td class="py-4 px-4">
+        <div>${tagsHtml}</div>
+        ${badgesHtml}
+      </td>
+      <td class="py-4 px-4 text-right space-x-2">
+        <button onclick="editContact('${c.id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">Edit</button>
+        <button onclick="deleteContact('${c.id}')" class="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function populateTagDropdowns() {
+  // Collect all unique tags
+  const tagsSet = new Set();
+  contacts.forEach(c => {
+    if (c.tags) {
+      c.tags.forEach(t => tagsSet.add(t));
+    }
+  });
+
+  const tagFilter = document.getElementById('contacts-tag-filter');
+  const bulkTagFilter = document.getElementById('bulk-tag-selector');
+
+  if (!tagFilter || !bulkTagFilter) return;
+
+  // Save current values
+  const currentFilterVal = tagFilter.value;
+  const currentBulkVal = bulkTagFilter.value;
+
+  tagFilter.innerHTML = '<option value="">All Tags</option>';
+  bulkTagFilter.innerHTML = '<option value="">-- Or Select Tag Segment --</option>';
+
+  Array.from(tagsSet).sort().forEach(tag => {
+    tagFilter.innerHTML += `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`;
+    bulkTagFilter.innerHTML += `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`;
+  });
+
+  // Restore values
+  tagFilter.value = currentFilterVal;
+  bulkTagFilter.value = currentBulkVal;
+}
+
+function filterContacts() {
+  const searchQuery = document.getElementById('contacts-search').value.toLowerCase().trim();
+  const selectedTag = document.getElementById('contacts-tag-filter').value;
+
+  const filtered = contacts.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery) || c.phone.includes(searchQuery);
+    const matchesTag = !selectedTag || (c.tags && c.tags.includes(selectedTag));
+    return matchesSearch && matchesTag;
+  });
+
+  renderContactsList(filtered);
+}
+
+function loadSegmentNumbers() {
+  const selectedTag = document.getElementById('bulk-tag-selector').value;
+  if (!selectedTag) return;
+
+  const matchingContacts = contacts.filter(c => c.tags && c.tags.includes(selectedTag));
+  const numbersText = matchingContacts.map(c => c.phone).join('\n');
+
+  const numbersTextarea = document.getElementById('sender-bulk-numbers');
+  numbersTextarea.value = numbersText;
+
+  // Visual feedback
+  numbersTextarea.focus();
+  numbersTextarea.style.borderColor = '#2563eb';
+  setTimeout(() => {
+    numbersTextarea.style.borderColor = '';
+  }, 400);
+}
+
+async function saveContact(mergeConfirmed = false) {
+  const id = document.getElementById('contact-id').value;
+  const name = document.getElementById('contact-name').value.trim();
+  const phone = document.getElementById('contact-phone').value.trim();
+  const tagsText = document.getElementById('contact-tags').value.trim();
+  
+  const birthday = document.getElementById('contact-birthday').value;
+  const anniversary = document.getElementById('contact-anniversary').value;
+  const paymentDate = document.getElementById('contact-payment-date').value;
+  const appointmentDate = document.getElementById('contact-appointment-date').value;
+
+  if (!name || !phone) {
+    alert('Both Name and Phone Number are required.');
+    return;
+  }
+
+  const payload = { name, phone, tags: tagsText, birthday, anniversary, paymentDate, appointmentDate };
+  if (id) payload.id = id;
+  if (mergeConfirmed) payload.merge = true;
+
+  try {
+    const res = await fetch('/api/contacts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      clearContactForm();
+      loadContacts();
+    } else {
+      const err = await res.json();
+      if (err.error === 'DUPLICATE_PHONE' && !mergeConfirmed) {
+        if (confirm(`A contact named "${err.existingContact.name}" already exists with this phone number.\n\nWould you like to merge these details/tags into the existing contact?`)) {
+          saveContact(true); // Retry with merge option
+        }
+      } else {
+        alert(`Error saving contact: ${err.error || err.message}`);
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error saving contact.');
+  }
+}
+
+async function deleteContact(id) {
+  if (!confirm('Are you sure you want to delete this contact?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/contacts/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (res.ok) {
+      loadContacts();
+    } else {
+      alert('Failed to delete contact.');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function editContact(id) {
+  const c = contacts.find(contact => contact.id === id);
+  if (!c) return;
+
+  document.getElementById('contact-id').value = c.id;
+  document.getElementById('contact-name').value = c.name;
+  document.getElementById('contact-phone').value = c.phone;
+  document.getElementById('contact-tags').value = c.tags ? c.tags.join(', ') : '';
+  
+  document.getElementById('contact-birthday').value = c.birthday || '';
+  document.getElementById('contact-anniversary').value = c.anniversary || '';
+  document.getElementById('contact-payment-date').value = c.paymentDate || '';
+  document.getElementById('contact-appointment-date').value = c.appointmentDate || '';
+
+  document.getElementById('contact-form-title').innerHTML = '<i data-lucide="edit" class="w-5 h-5 text-blue-600"></i> Edit Contact';
+  document.getElementById('btn-cancel-contact-edit').classList.remove('hidden');
+  updateIcons();
+}
+
+function clearContactForm() {
+  document.getElementById('contact-id').value = '';
+  document.getElementById('contact-name').value = '';
+  document.getElementById('contact-phone').value = '';
+  document.getElementById('contact-tags').value = '';
+  
+  document.getElementById('contact-birthday').value = '';
+  document.getElementById('contact-anniversary').value = '';
+  document.getElementById('contact-payment-date').value = '';
+  document.getElementById('contact-appointment-date').value = '';
+
+  document.getElementById('contact-form-title').innerHTML = '<i data-lucide="user-plus" class="w-5 h-5 text-blue-600"></i> Add Contact';
+  document.getElementById('btn-cancel-contact-edit').classList.add('hidden');
+  updateIcons();
+}
+
+// ─── WORKFLOWS & AUTOMATIONS FRONTEND ─────────────────────────────
+
+async function loadAutomations() {
+  try {
+    const res = await fetch('/api/automations', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (res.ok) {
+      automations = await res.json();
+      renderAutomationsList();
+    }
+  } catch (err) {
+    console.error('Error loading automations:', err);
+  }
+}
+
+function renderAutomationsList() {
+  const tbody = document.getElementById('automations-list');
+  tbody.innerHTML = '';
+
+  if (automations.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500 italic">No automation workflows configured yet.</td></tr>`;
+    return;
+  }
+
+  // Populate trigger tag select dropdown too
+  const ruleTagSelect = document.getElementById('automation-tag');
+  if (ruleTagSelect) {
+    const uniqueTags = new Set();
+    contacts.forEach(c => c.tags && c.tags.forEach(t => uniqueTags.add(t)));
+    
+    const currentVal = ruleTagSelect.value;
+    ruleTagSelect.innerHTML = '<option value="">All Contacts</option>';
+    Array.from(uniqueTags).sort().forEach(tag => {
+      ruleTagSelect.innerHTML += `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`;
+    });
+    ruleTagSelect.value = currentVal;
+  }
+
+  automations.forEach(rule => {
+    const row = document.createElement('tr');
+    row.className = 'border-b border-slate-200 hover:bg-slate-50 transition-colors';
+
+    const triggerBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">${escapeHtml(rule.triggerType)}</span>`;
+    const targetBadge = rule.targetTag
+      ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-705 border border-slate-200">${escapeHtml(rule.targetTag)}</span>`
+      : '<span class="text-slate-400 italic">All Contacts</span>';
+
+    const statusToggle = `
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" ${rule.isActive ? 'checked' : ''} onchange="toggleAutomationRule('${rule.id}', ${rule.isActive})" class="sr-only peer">
+        <div class="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
+      </label>
+    `;
+
+    row.innerHTML = `
+      <td class="py-4 px-4 font-bold text-slate-750">${escapeHtml(rule.name)}</td>
+      <td class="py-4 px-4">${triggerBadge}</td>
+      <td class="py-4 px-4">${targetBadge}</td>
+      <td class="py-4 px-4">${statusToggle}</td>
+      <td class="py-4 px-4 text-right space-x-2">
+        <button onclick="editAutomationRule('${rule.id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">Edit</button>
+        <button onclick="deleteAutomationRule('${rule.id}')" class="text-xs font-semibold text-rose-505 hover:text-rose-600 transition-colors">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  updateIcons();
+}
+
+async function saveAutomationRule() {
+  const id = document.getElementById('automation-id').value;
+  const name = document.getElementById('automation-name').value.trim();
+  const triggerType = document.getElementById('automation-trigger').value;
+  const targetTag = document.getElementById('automation-tag').value;
+  const delayHours = document.getElementById('automation-delay').value;
+  const messageTemplate = document.getElementById('automation-message').value.trim();
+
+  if (!name || !triggerType || !messageTemplate) {
+    alert('Name, trigger, and message content are required.');
+    return;
+  }
+
+  const payload = { name, triggerType, targetTag, delayHours, messageTemplate };
+  if (id) {
+    payload.id = id;
+    const existing = automations.find(a => a.id === id);
+    if (existing) payload.isActive = existing.isActive;
+  }
+
+  try {
+    const res = await fetch('/api/automations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      clearAutomationForm();
+      loadAutomations();
+    } else {
+      const err = await res.json();
+      alert(`Error: ${err.error}`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Network error saving automation rule.');
+  }
+}
+
+async function deleteAutomationRule(id) {
+  if (!confirm('Are you sure you want to delete this workflow?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/automations/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (res.ok) {
+      loadAutomations();
+    } else {
+      alert('Failed to delete workflow.');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function toggleAutomationRule(id, currentStatus) {
+  const rule = automations.find(a => a.id === id);
+  if (!rule) return;
+
+  const payload = { ...rule, isActive: !currentStatus };
+
+  try {
+    await fetch('/api/automations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+    loadAutomations();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function editAutomationRule(id) {
+  const rule = automations.find(a => a.id === id);
+  if (!rule) return;
+
+  document.getElementById('automation-id').value = rule.id;
+  document.getElementById('automation-name').value = rule.name;
+  document.getElementById('automation-trigger').value = rule.triggerType;
+  document.getElementById('automation-tag').value = rule.targetTag || '';
+  document.getElementById('automation-delay').value = rule.delayHours || 24;
+  document.getElementById('automation-message').value = rule.messageTemplate;
+
+  toggleAutomationFields();
+
+  document.getElementById('automation-form-title').innerHTML = '<i data-lucide="edit" class="w-5 h-5 text-blue-600"></i> Edit Rule';
+  document.getElementById('btn-cancel-automation-edit').classList.remove('hidden');
+  updateIcons();
+}
+
+function clearAutomationForm() {
+  document.getElementById('automation-id').value = '';
+  document.getElementById('automation-name').value = '';
+  document.getElementById('automation-trigger').value = 'WELCOME';
+  document.getElementById('automation-tag').value = '';
+  document.getElementById('automation-delay').value = 24;
+  document.getElementById('automation-message').value = '';
+
+  toggleAutomationFields();
+
+  document.getElementById('automation-form-title').innerHTML = '<i data-lucide="git-branch" class="w-5 h-5 text-blue-600"></i> Create Rule';
+  document.getElementById('btn-cancel-automation-edit').classList.add('hidden');
+  updateIcons();
+}
+
+function toggleAutomationFields() {
+  const trigger = document.getElementById('automation-trigger').value;
+  const delayGroup = document.getElementById('automation-delay-group');
+  
+  if (trigger === 'FOLLOW_UP' || trigger === 'NO_REPLY') {
+    delayGroup.classList.remove('hidden');
+  } else {
+    delayGroup.classList.add('hidden');
+  }
+}
+
+// ─── DUPLICATES CONTACT DETECTION & MERGING ───────────────────────
+
+let duplicatePhoneGroups = {};
+
+function scanForDuplicates() {
+  // Group contacts by clean phone number
+  const groups = {};
+  contacts.forEach(c => {
+    const clean = c.phone.replace(/\D/g, '');
+    if (!groups[clean]) groups[clean] = [];
+    groups[clean].push(c);
+  });
+
+  // Filter only duplicates
+  duplicatePhoneGroups = {};
+  let totalDuplicates = 0;
+  for (let clean in groups) {
+    if (groups[clean].length > 1) {
+      duplicatePhoneGroups[clean] = groups[clean];
+      totalDuplicates++;
+    }
+  }
+
+  // Render Duplicates List inside modal
+  const tbody = document.getElementById('duplicate-merge-list');
+  tbody.innerHTML = '';
+
+  if (totalDuplicates === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="py-6 text-center text-slate-500 italic">No duplicate phone records found in directory.</td></tr>`;
+  } else {
+    for (let phone in duplicatePhoneGroups) {
+      const records = duplicatePhoneGroups[phone];
+      const namesList = records.map(r => `${escapeHtml(r.name)} (${r.tags && r.tags.length > 0 ? r.tags.join(',') : 'No Tags'})`).join(', ');
+      
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-slate-100 transition-colors border-b border-slate-200';
+      row.innerHTML = `
+        <td class="py-3 px-4 font-mono font-semibold">+${phone}</td>
+        <td class="py-3 px-4 text-slate-650 max-w-sm truncate" title="${namesList}">${namesList}</td>
+        <td class="py-3 px-4 text-right">
+          <button onclick="mergeDuplicates('${phone}')" class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-lg transition-colors">Merge</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    }
+  }
+
+  // Open modal
+  const modal = document.getElementById('duplicate-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  updateIcons();
+}
+
+function closeDuplicateModal() {
+  const modal = document.getElementById('duplicate-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+async function mergeDuplicates(phone) {
+  const records = duplicatePhoneGroups[phone];
+  if (!records || records.length < 2) return;
+
+  // We will keep the first record as the primary contact, merge tags from all others, and delete the rest
+  const primary = records[0];
+  const allTags = new Set();
+  
+  records.forEach(r => {
+    if (r.tags) r.tags.forEach(t => allTags.add(t));
+  });
+
+  const mergedPayload = {
+    id: primary.id,
+    name: primary.name,
+    phone: primary.phone,
+    tags: Array.from(allTags).join(', '),
+    birthday: records.find(r => r.birthday)?.birthday || '',
+    anniversary: records.find(r => r.anniversary)?.anniversary || '',
+    paymentDate: records.find(r => r.paymentDate)?.paymentDate || '',
+    appointmentDate: records.find(r => r.appointmentDate)?.appointmentDate || ''
+  };
+
+  try {
+    // 1. Update the primary contact with merged tags and fields
+    const res = await fetch('/api/contacts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(mergedPayload)
+    });
+
+    if (res.ok) {
+      // 2. Delete all other secondary duplicate contacts
+      for (let i = 1; i < records.length; i++) {
+        await fetch(`/api/contacts/${records[i].id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+      }
+      loadContacts();
+      setTimeout(() => scanForDuplicates(), 300); // refresh list
+    } else {
+      alert('Failed to update primary contact during merge.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Error during merge process.');
+  }
+}
+
+async function autoMergeAllDuplicates() {
+  const phones = Object.keys(duplicatePhoneGroups);
+  if (phones.length === 0) {
+    alert('No duplicates to merge.');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to merge all ${phones.length} duplicate groups?`)) {
+    return;
+  }
+
+  for (let phone of phones) {
+    await mergeDuplicates(phone);
+  }
+  closeDuplicateModal();
+  alert('All duplicate records merged successfully!');
+}
+
+// ─── WORKFLOW LEAD NURTURING SEQUENCES BUILDER ────────────────────
+
+let sequenceSteps = [];
+
+function switchWorkflowSubTab(tabName) {
+  // Hide all subpanels
+  document.getElementById('workflow-subpanel-rules').classList.add('hidden');
+  document.getElementById('workflow-subpanel-sequences').classList.add('hidden');
+
+  // Deactivate buttons
+  document.getElementById('workflow-tab-rules').className = 'pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-700 transition-all';
+  document.getElementById('workflow-tab-sequences').className = 'pb-3 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-700 transition-all';
+
+  // Activate targets
+  if (tabName === 'rules') {
+    document.getElementById('workflow-subpanel-rules').classList.remove('hidden');
+    document.getElementById('workflow-tab-rules').className = 'pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition-all';
+  } else {
+    document.getElementById('workflow-subpanel-sequences').classList.remove('hidden');
+    document.getElementById('workflow-tab-sequences').className = 'pb-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition-all';
+    populateSequenceTagDropdown();
+  }
+  updateIcons();
+}
+
+async function loadSequences() {
+  try {
+    const res = await fetch('/api/sequences', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (res.ok) {
+      sequences = await res.json();
+      renderSequencesList();
+    }
+  } catch (err) {
+    console.error('Error loading sequences:', err);
+  }
+}
+
+function populateSequenceTagDropdown() {
+  const select = document.getElementById('sequence-tag');
+  if (!select) return;
+
+  const uniqueTags = new Set();
+  contacts.forEach(c => c.tags && c.tags.forEach(t => uniqueTags.add(t)));
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- Select Target Tag --</option>';
+  Array.from(uniqueTags).sort().forEach(tag => {
+    select.innerHTML += `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`;
+  });
+  select.value = currentVal;
+}
+
+function renderSequencesList() {
+  const tbody = document.getElementById('sequences-list');
+  tbody.innerHTML = '';
+
+  if (sequences.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500 italic">No nurturing sequences built yet.</td></tr>`;
+    return;
+  }
+
+  sequences.forEach(seq => {
+    const row = document.createElement('tr');
+    row.className = 'border-b border-slate-200 hover:bg-slate-50 transition-colors';
+
+    const segmentBadge = seq.targetTag
+      ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-650 border border-blue-100">${escapeHtml(seq.targetTag)}</span>`
+      : '<span class="text-slate-400 italic">No Target Tag</span>';
+
+    const statusToggle = `
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" ${seq.isActive ? 'checked' : ''} onchange="toggleSequenceWorkflow('${seq.id}', ${seq.isActive})" class="sr-only peer">
+        <div class="w-8 h-4.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
+      </label>
+    `;
+
+    row.innerHTML = `
+      <td class="py-4 px-4 font-bold text-slate-750">${escapeHtml(seq.name)}</td>
+      <td class="py-4 px-4">${segmentBadge}</td>
+      <td class="py-4 px-4 font-mono font-bold text-blue-600">${seq.steps ? seq.steps.length : 0} Steps</td>
+      <td class="py-4 px-4">${statusToggle}</td>
+      <td class="py-4 px-4 text-right space-x-2">
+        <button onclick="editSequenceWorkflow('${seq.id}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">Edit</button>
+        <button onclick="deleteSequenceWorkflow('${seq.id}')" class="text-xs font-semibold text-rose-505 hover:text-rose-600 transition-colors">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  updateIcons();
+}
+
+function addStepToTimeline() {
+  const delayInput = document.getElementById('step-delay-input');
+  const messageInput = document.getElementById('step-message-input');
+
+  const delayHours = delayInput.value;
+  const messageTemplate = messageInput.value.trim();
+
+  if (delayHours === '' || !messageTemplate) {
+    alert('Please enter both delay hours and message content.');
+    return;
+  }
+
+  sequenceSteps.push({
+    delayHours: parseInt(delayHours),
+    messageTemplate
+  });
+
+  // Sort steps by delay time ascending
+  sequenceSteps.sort((a, b) => a.delayHours - b.delayHours);
+
+  delayInput.value = '24';
+  messageInput.value = '';
+
+  renderStepsTimeline();
+}
+
+function removeStepFromTimeline(index) {
+  sequenceSteps.splice(index, 1);
+  renderStepsTimeline();
+}
+
+function renderStepsTimeline() {
+  const container = document.getElementById('sequence-steps-timeline');
+  container.innerHTML = '';
+
+  if (sequenceSteps.length === 0) {
+    container.innerHTML = `<div class="p-4 text-center text-slate-400 italic text-[11px] border border-dashed border-slate-200 rounded-xl">No steps added yet. Setup steps using the form below.</div>`;
+    return;
+  }
+
+  sequenceSteps.forEach((step, idx) => {
+    const card = document.createElement('div');
+    card.className = 'relative pl-8 pb-4 border-l-2 border-blue-100 last:pb-0';
+    
+    // Custom timeline node dot
+    card.innerHTML = `
+      <div class="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></div>
+      <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold text-slate-400 uppercase">Step ${idx + 1} &bull; Send after ${step.delayHours} Hours</span>
+          <button type="button" onclick="removeStepFromTimeline(${idx})" class="text-[10px] text-rose-500 hover:text-rose-600 font-bold transition-colors">Remove</button>
+        </div>
+        <p class="text-xs text-slate-650 leading-relaxed truncate whitespace-pre-wrap max-h-16 overflow-hidden">${escapeHtml(step.messageTemplate)}</p>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function saveSequenceWorkflow() {
+  const id = document.getElementById('sequence-id').value;
+  const name = document.getElementById('sequence-name').value.trim();
+  const targetTag = document.getElementById('sequence-tag').value;
+
+  if (!name || !targetTag) {
+    alert('Sequence name and target tag segment are required.');
+    return;
+  }
+
+  if (sequenceSteps.length === 0) {
+    alert('Please add at least one step to the sequence.');
+    return;
+  }
+
+  const payload = { name, targetTag, steps: sequenceSteps };
+  if (id) {
+    payload.id = id;
+    const existing = sequences.find(s => s.id === id);
+    if (existing) payload.isActive = existing.isActive;
+  }
+
+  try {
+    const res = await fetch('/api/sequences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      clearSequenceForm();
+      loadSequences();
+    } else {
+      const err = await res.json();
+      alert(`Error: ${err.error}`);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Network error saving sequence.');
+  }
+}
+
+async function deleteSequenceWorkflow(id) {
+  if (!confirm('Are you sure you want to delete this sequence?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/sequences/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    if (res.ok) {
+      loadSequences();
+    } else {
+      alert('Failed to delete sequence.');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function toggleSequenceWorkflow(id, currentStatus) {
+  const seq = sequences.find(s => s.id === id);
+  if (!seq) return;
+
+  const payload = { ...seq, isActive: !currentStatus };
+
+  try {
+    await fetch('/api/sequences', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+    loadSequences();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function editSequenceWorkflow(id) {
+  const seq = sequences.find(s => s.id === id);
+  if (!seq) return;
+
+  document.getElementById('sequence-id').value = seq.id;
+  document.getElementById('sequence-name').value = seq.name;
+  
+  populateSequenceTagDropdown();
+  document.getElementById('sequence-tag').value = seq.targetTag || '';
+
+  sequenceSteps = [...seq.steps];
+  renderStepsTimeline();
+
+  document.getElementById('sequence-form-title').innerHTML = '<i data-lucide="edit" class="w-5 h-5 text-blue-600"></i> Edit Sequence';
+  document.getElementById('btn-cancel-sequence-edit').classList.remove('hidden');
+  updateIcons();
+}
+
+function clearSequenceForm() {
+  document.getElementById('sequence-id').value = '';
+  document.getElementById('sequence-name').value = '';
+  document.getElementById('sequence-tag').value = '';
+
+  sequenceSteps = [];
+  renderStepsTimeline();
+
+  document.getElementById('sequence-form-title').innerHTML = '<i data-lucide="git-pull-request" class="w-5 h-5 text-blue-600"></i> Build Sequence';
+  document.getElementById('btn-cancel-sequence-edit').classList.add('hidden');
+  updateIcons();
+}
+
 
 // ─── INITIALIZATION ───────────────────────────────────────────────
 
 // Check Auth state on start
 checkAuthState();
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('sidebar-menu');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) {
+    if (sidebar.classList.contains('hidden')) {
+      sidebar.classList.remove('hidden');
+      sidebar.classList.add('flex');
+      if (backdrop) backdrop.classList.remove('hidden');
+    } else {
+      sidebar.classList.add('hidden');
+      sidebar.classList.remove('flex');
+      if (backdrop) backdrop.classList.add('hidden');
+    }
+  }
+}
+
+async function requestPairingCodeFlow() {
+  const inputEl = document.getElementById('pairing-phone-input');
+  if (!inputEl) return;
+  const pairingNumber = inputEl.value.trim().replace(/\D/g, '');
+  
+  if (!pairingNumber || pairingNumber.length < 8) {
+    alert('Please enter a valid phone number with country code (e.g. 919750750519).');
+    return;
+  }
+  
+  const getBtn = document.querySelector('button[onclick="requestPairingCodeFlow()"]');
+  if (getBtn) {
+    getBtn.disabled = true;
+    getBtn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div> Getting...';
+  }
+  
+  try {
+    const res = await fetch('/api/connect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ pairingNumber })
+    });
+    
+    if (!res.ok) {
+      alert('Failed to request pairing code connection.');
+    }
+  } catch (err) {
+    console.error(err);
+    alert('Network error requesting pairing code.');
+  } finally {
+    if (getBtn) {
+      getBtn.disabled = false;
+      getBtn.innerHTML = '<i data-lucide="key" class="w-3.5 h-3.5 text-blue-400"></i> Get Code';
+      updateIcons();
+    }
+  }
+}
 
 

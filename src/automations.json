@@ -1,0 +1,11 @@
+[
+  {
+    "id": "1781247516425",
+    "name": "Annual Birthday Wish",
+    "triggerType": "BIRTHDAY",
+    "targetTag": "",
+    "messageTemplate": "Happy Birthday, {name}! 🎂 Hope you have an amazing day! 🎉",
+    "delayHours": 24,
+    "isActive": true
+  }
+]

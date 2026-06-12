@@ -1,0 +1,30 @@
+[
+  {
+    "id": "1",
+    "name": "Albin Jegus",
+    "phone": "919750750519",
+    "tags": [
+      "VIP",
+      "Customer"
+    ]
+  },
+  {
+    "id": "2",
+    "name": "Kaira Support",
+    "phone": "919489344570",
+    "tags": [
+      "Support"
+    ]
+  },
+  {
+    "id": "1781247611154",
+    "name": "Abish",
+    "phone": "9360811301",
+    "tags": [],
+    "birthday": "2026-06-13",
+    "anniversary": "",
+    "paymentDate": "",
+    "appointmentDate": "",
+    "lastAutomationSent": {}
+  }
+]

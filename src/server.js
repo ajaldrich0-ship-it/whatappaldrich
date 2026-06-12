@@ -30,6 +30,9 @@ const AUTO_REPLIES_FILE = path.join(__dirname, 'auto-replies.json');
 const SCHEDULED_MESSAGES_FILE = path.join(__dirname, 'scheduled-messages.json');
 const TEMPLATES_FILE = path.join(__dirname, 'templates.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
+const CONTACTS_FILE = path.join(__dirname, 'contacts.json');
+const AUTOMATIONS_FILE = path.join(__dirname, 'automations.json');
+const SEQUENCES_FILE = path.join(__dirname, 'sequences.json');
 
 
 
@@ -123,6 +126,69 @@ function saveUsers() {
   }
 }
 
+// Load contacts
+let contacts = [];
+try {
+  if (fs.existsSync(CONTACTS_FILE)) {
+    contacts = JSON.parse(fs.readFileSync(CONTACTS_FILE, 'utf8'));
+  } else {
+    contacts = [];
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
+  }
+} catch (err) {
+  console.error('Error reading contacts file:', err);
+}
+
+function saveContacts() {
+  try {
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
+  } catch (err) {
+    console.error('Error writing contacts file:', err);
+  }
+}
+
+// Load automations
+let automations = [];
+try {
+  if (fs.existsSync(AUTOMATIONS_FILE)) {
+    automations = JSON.parse(fs.readFileSync(AUTOMATIONS_FILE, 'utf8'));
+  } else {
+    automations = [];
+    fs.writeFileSync(AUTOMATIONS_FILE, JSON.stringify(automations, null, 2));
+  }
+} catch (err) {
+  console.error('Error reading automations file:', err);
+}
+
+function saveAutomations() {
+  try {
+    fs.writeFileSync(AUTOMATIONS_FILE, JSON.stringify(automations, null, 2));
+  } catch (err) {
+    console.error('Error writing automations file:', err);
+  }
+}
+
+// Load sequences
+let sequences = [];
+try {
+  if (fs.existsSync(SEQUENCES_FILE)) {
+    sequences = JSON.parse(fs.readFileSync(SEQUENCES_FILE, 'utf8'));
+  } else {
+    sequences = [];
+    fs.writeFileSync(SEQUENCES_FILE, JSON.stringify(sequences, null, 2));
+  }
+} catch (err) {
+  console.error('Error reading sequences file:', err);
+}
+
+function saveSequences() {
+  try {
+    fs.writeFileSync(SEQUENCES_FILE, JSON.stringify(sequences, null, 2));
+  } catch (err) {
+    console.error('Error writing sequences file:', err);
+  }
+}
+
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
@@ -162,7 +228,7 @@ let qrCodeData = null;
 let clientProfile = null;
 let client = null;
 
-function initializeWhatsApp() {
+function initializeWhatsApp(pairingNumber = null) {
   logToSystem('Initializing WhatsApp client...', 'info');
   clientStatus = 'INITIALIZING';
   io.emit('status', { status: clientStatus });
@@ -187,6 +253,7 @@ function initializeWhatsApp() {
   });
 
   client.on('qr', (qr) => {
+    if (pairingNumber) return; // skip QR code if pairing via phone number
     qrCodeData = qr;
     clientStatus = 'QR_READY';
     logToSystem('New QR Code generated, waiting for scan...', 'info');
@@ -230,6 +297,32 @@ function initializeWhatsApp() {
     logToSystem(`Received message from ${senderName}: "${body}"`, 'incoming');
     io.emit('message_received', { from: senderName, body });
 
+    // Update CRM tracking and check Welcome triggers
+    try {
+      const cleanFrom = msg.from.replace(/\D/g, '');
+      let existingContact = contacts.find(c => c.phone.replace(/\D/g, '') === cleanFrom);
+      
+      if (existingContact) {
+        existingContact.lastMessageFromClient = new Date().toISOString();
+        existingContact.lastMessageDirection = 'in';
+        saveContacts();
+        io.emit('contacts_updated', contacts);
+      } else {
+        // New user! Trigger active welcome rules
+        const welcomeRules = automations.filter(r => r.isActive && r.triggerType === 'WELCOME');
+        for (let rule of welcomeRules) {
+          let welcomeMsg = rule.messageTemplate
+            .replaceAll('{name}', senderName)
+            .replaceAll('{phone}', cleanFrom);
+          await client.sendMessage(msg.from, welcomeMsg);
+          logToSystem(`Sent auto-welcome to ${senderName}: "${welcomeMsg}"`, 'outgoing');
+          io.emit('message_sent', { to: cleanFrom, body: welcomeMsg });
+        }
+      }
+    } catch (err) {
+      console.error('Error in CRM/Welcome automation check:', err);
+    }
+
     // Handle Auto Replies
     const lowerBody = body.toLowerCase();
     if (autoReplies[lowerBody]) {
@@ -255,7 +348,20 @@ function initializeWhatsApp() {
     io.emit('status', { status: clientStatus });
   });
 
-  client.initialize().catch(err => {
+  client.initialize().then(async () => {
+    if (pairingNumber) {
+      try {
+        logToSystem(`Requesting pairing code for +${pairingNumber}...`, 'info');
+        const code = await client.requestPairingCode(pairingNumber);
+        logToSystem(`WhatsApp Pairing Code: ${code}`, 'success');
+        io.emit('pairing_code', { code });
+        clientStatus = 'QR_READY';
+        io.emit('status', { status: clientStatus, pairingActive: true });
+      } catch (err) {
+        logToSystem(`Failed to request pairing code: ${err.message}`, 'error');
+      }
+    }
+  }).catch(err => {
     clientStatus = 'DISCONNECTED';
     logToSystem(`Failed to initialize WhatsApp client: ${err.message}`, 'error');
     io.emit('status', { status: clientStatus });
@@ -282,12 +388,29 @@ async function checkScheduledMessages() {
         if (formattedNumber.length === 10) {
           formattedNumber = '91' + formattedNumber;
         }
-
         const chatId = `${formattedNumber}@c.us`;
         await client.sendMessage(chatId, msg.message);
-        msg.status = 'SENT';
-        msg.sentTime = new Date().toISOString();
-        logToSystem(`Scheduled message sent successfully to +${formattedNumber}!`, 'success');
+        
+        const recurrence = msg.recurrence || 'NONE';
+        if (recurrence !== 'NONE') {
+          msg.status = 'PENDING';
+          msg.lastSentTime = new Date().toISOString();
+          
+          const nextDate = new Date(msg.scheduledTime);
+          if (recurrence === 'DAILY') {
+            nextDate.setDate(nextDate.getDate() + 1);
+          } else if (recurrence === 'WEEKLY') {
+            nextDate.setDate(nextDate.getDate() + 7);
+          } else if (recurrence === 'MONTHLY') {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+          }
+          msg.scheduledTime = nextDate.toISOString();
+          logToSystem(`Recurring (${recurrence}) message sent successfully to +${formattedNumber}! Next run scheduled for ${msg.scheduledTime}`, 'success');
+        } else {
+          msg.status = 'SENT';
+          msg.sentTime = new Date().toISOString();
+          logToSystem(`Scheduled message sent successfully to +${formattedNumber}!`, 'success');
+        }
         io.emit('message_sent', { to: formattedNumber, body: msg.message });
       } catch (err) {
         msg.status = 'FAILED';
@@ -305,6 +428,183 @@ async function checkScheduledMessages() {
 
 // Tick every 15 seconds
 setInterval(checkScheduledMessages, 15000);
+
+// Background automations check runner
+async function checkWorkflowAutomations() {
+  if (clientStatus !== 'CONNECTED' || !client) return;
+
+  const now = new Date();
+  const todayMMDD = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const todayYYYYMMDD = now.toISOString().split('T')[0];
+
+  let contactsChanged = false;
+
+  for (let rule of automations) {
+    if (!rule.isActive) continue;
+
+    // Filter contacts by target tag if rule has targetTag
+    const targetContacts = rule.targetTag 
+      ? contacts.filter(c => c.tags && c.tags.includes(rule.targetTag)) 
+      : contacts;
+
+    for (let contact of targetContacts) {
+      let shouldTrigger = false;
+      let automationSentKey = todayYYYYMMDD; // default sent key for daily triggers
+
+      if (rule.triggerType === 'BIRTHDAY' && contact.birthday) {
+        // format could be YYYY-MM-DD or MM-DD
+        const bMMDD = contact.birthday.substring(contact.birthday.length - 5);
+        if (bMMDD === todayMMDD) {
+          shouldTrigger = true;
+        }
+      } 
+      else if (rule.triggerType === 'ANNIVERSARY' && contact.anniversary) {
+        const aMMDD = contact.anniversary.substring(contact.anniversary.length - 5);
+        if (aMMDD === todayMMDD) {
+          shouldTrigger = true;
+        }
+      } 
+      else if (rule.triggerType === 'PAYMENT' && contact.paymentDate) {
+        if (contact.paymentDate === todayYYYYMMDD) {
+          shouldTrigger = true;
+        }
+      } 
+      else if (rule.triggerType === 'APPOINTMENT' && contact.appointmentDate) {
+        const apptTime = new Date(contact.appointmentDate);
+        const diffMs = apptTime - now;
+        const diffMins = diffMs / (1000 * 60);
+        
+        // Trigger if appointment is in the next 30 minutes, and not already triggered
+        if (diffMins > 0 && diffMins <= 30) {
+          shouldTrigger = true;
+          automationSentKey = contact.appointmentDate; // specific appointment timestamp key
+        }
+      }
+      else if (rule.triggerType === 'FOLLOW_UP') {
+        // Trigger if last message was sent by us (direction === 'out'), and no incoming message since,
+        // and time elapsed is greater than delayHours
+        if (contact.lastMessageDirection === 'out' && contact.lastMessageFromMe) {
+          const lastSent = new Date(contact.lastMessageFromMe);
+          const hoursElapsed = (now - lastSent) / (1000 * 60 * 60);
+          if (hoursElapsed >= (rule.delayHours || 24)) {
+            shouldTrigger = true;
+            automationSentKey = contact.lastMessageFromMe; // use message timestamp as key to avoid repeats
+          }
+        }
+      }
+      else if (rule.triggerType === 'NO_REPLY') {
+        // Trigger if last message was received from client (direction === 'in'), and no outgoing message since,
+        // and time elapsed is greater than delayHours
+        if (contact.lastMessageDirection === 'in' && contact.lastMessageFromClient) {
+          const lastRecv = new Date(contact.lastMessageFromClient);
+          const hoursElapsed = (now - lastRecv) / (1000 * 60 * 60);
+          if (hoursElapsed >= (rule.delayHours || 24)) {
+            shouldTrigger = true;
+            automationSentKey = contact.lastMessageFromClient;
+          }
+        }
+      }
+
+      // Check if already sent
+      if (shouldTrigger) {
+        if (!contact.lastAutomationSent) contact.lastAutomationSent = {};
+        if (contact.lastAutomationSent[rule.id] === automationSentKey) {
+          // Already sent for this trigger window
+          continue;
+        }
+
+        // Send message!
+        let formattedNumber = contact.phone.replace(/\D/g, '');
+        if (formattedNumber.length === 10) {
+          formattedNumber = '91' + formattedNumber;
+        }
+        const chatId = `${formattedNumber}@c.us`;
+
+        // Personalize template
+        let message = rule.messageTemplate
+          .replaceAll('{name}', contact.name)
+          .replaceAll('{phone}', contact.phone);
+
+        logToSystem(`Triggered automation rule "${rule.name}" for ${contact.name}...`, 'info');
+        try {
+          await client.sendMessage(chatId, message);
+          logToSystem(`Automation message sent successfully to +${formattedNumber}!`, 'success');
+          io.emit('message_sent', { to: formattedNumber, body: message });
+
+          // Record as sent
+          contact.lastAutomationSent[rule.id] = automationSentKey;
+          // Also update message direction state so follow-up rules don't loop endlessly
+          contact.lastMessageFromMe = new Date().toISOString();
+          contact.lastMessageDirection = 'out';
+          contactsChanged = true;
+        } catch (err) {
+          logToSystem(`Failed to send automation message to +${formattedNumber}: ${err.message}`, 'error');
+        }
+      }
+    }
+  }
+
+  // Process Lead Nurturing Sequences
+  for (let seq of sequences) {
+    if (!seq.isActive || !seq.steps || seq.steps.length === 0) continue;
+
+    // Filter contacts that have targetTag
+    const targetContacts = seq.targetTag
+      ? contacts.filter(c => c.tags && c.tags.includes(seq.targetTag))
+      : [];
+
+    for (let contact of targetContacts) {
+      if (!contact.sequenceStatus) contact.sequenceStatus = {};
+      if (!contact.sequenceStatus[seq.id]) {
+        contact.sequenceStatus[seq.id] = {
+          startTime: new Date().toISOString(),
+          currentStep: 0,
+          lastSentTime: null
+        };
+        contactsChanged = true;
+      }
+
+      const status = contact.sequenceStatus[seq.id];
+      if (status.currentStep < seq.steps.length) {
+        const step = seq.steps[status.currentStep];
+        const startTime = new Date(status.startTime);
+        const hoursElapsed = (now - startTime) / (1000 * 60 * 60);
+
+        if (hoursElapsed >= (parseInt(step.delayHours) || 0)) {
+          let formattedNumber = contact.phone.replace(/\D/g, '');
+          if (formattedNumber.length === 10) {
+            formattedNumber = '91' + formattedNumber;
+          }
+          const chatId = `${formattedNumber}@c.us`;
+          let message = step.messageTemplate
+            .replaceAll('{name}', contact.name)
+            .replaceAll('{phone}', contact.phone);
+
+          logToSystem(`Triggered nurturing sequence "${seq.name}" step ${status.currentStep + 1} for ${contact.name}...`, 'info');
+          try {
+            await client.sendMessage(chatId, message);
+            logToSystem(`Nurturing message sent successfully to +${formattedNumber}!`, 'success');
+            io.emit('message_sent', { to: formattedNumber, body: message });
+
+            status.currentStep++;
+            status.lastSentTime = new Date().toISOString();
+            contactsChanged = true;
+          } catch (err) {
+            logToSystem(`Failed to send nurturing message to +${formattedNumber}: ${err.message}`, 'error');
+          }
+        }
+      }
+    }
+  }
+
+  if (contactsChanged) {
+    saveContacts();
+    io.emit('contacts_updated', contacts);
+  }
+}
+
+// Tick every 30 seconds for automations
+setInterval(checkWorkflowAutomations, 30000);
 
 
 // API Routes
@@ -414,6 +714,16 @@ app.post('/api/send', requireAuth, async (req, res) => {
     const chatId = `${formattedNumber}@c.us`;
     await client.sendMessage(chatId, message);
     
+    // Update contact message stats
+    const cleanTo = formattedNumber;
+    let existingContact = contacts.find(c => c.phone.replace(/\D/g, '') === cleanTo);
+    if (existingContact) {
+      existingContact.lastMessageFromMe = new Date().toISOString();
+      existingContact.lastMessageDirection = 'out';
+      saveContacts();
+      io.emit('contacts_updated', contacts);
+    }
+    
     logToSystem(`Sent manual message to ${formattedNumber}: "${message}"`, 'outgoing');
     io.emit('message_sent', { to: formattedNumber, body: message });
     res.json({ success: true });
@@ -458,7 +768,7 @@ app.get('/api/schedule', requireAuth, (req, res) => {
 });
 
 app.post('/api/schedule', requireAuth, (req, res) => {
-  const { number, message, scheduledTime } = req.body;
+  const { number, message, scheduledTime, recurrence } = req.body;
   if (!number || !message || !scheduledTime) {
     return res.status(400).json({ error: 'Number, message, and scheduledTime are required' });
   }
@@ -468,6 +778,7 @@ app.post('/api/schedule', requireAuth, (req, res) => {
     number,
     message,
     scheduledTime,
+    recurrence: recurrence || 'NONE',
     status: 'PENDING',
     createdAt: new Date().toISOString()
   };
@@ -491,6 +802,110 @@ app.delete('/api/schedule/:id', requireAuth, (req, res) => {
   logToSystem(`Scheduled message cancelled.`, 'info');
   io.emit('scheduled_updated', scheduledMessages);
   res.json({ success: true, removed });
+});
+
+// Contacts Segmentation REST API
+app.get('/api/contacts', requireAuth, (req, res) => {
+  res.json(contacts);
+});
+
+app.post('/api/contacts', requireAuth, (req, res) => {
+  const { id, name, phone, tags, birthday, anniversary, paymentDate, appointmentDate, merge } = req.body;
+  if (!name || !phone) {
+    return res.status(400).json({ error: 'Name and phone are required' });
+  }
+
+  // Format array of tags
+  const tagsArray = Array.isArray(tags) ? tags : (tags ? String(tags).split(',').map(t => t.trim()).filter(Boolean) : []);
+  const cleanPhone = phone.replace(/\D/g, '');
+
+  if (id) {
+    // Edit contact
+    const idx = contacts.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      contacts[idx] = {
+        ...contacts[idx],
+        name,
+        phone,
+        tags: tagsArray,
+        birthday: birthday || contacts[idx].birthday || '',
+        anniversary: anniversary || contacts[idx].anniversary || '',
+        paymentDate: paymentDate || contacts[idx].paymentDate || '',
+        appointmentDate: appointmentDate || contacts[idx].appointmentDate || ''
+      };
+      logToSystem(`Contact "${name}" updated.`, 'info');
+    } else {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+  } else {
+    // Check if phone already exists
+    const duplicateIdx = contacts.findIndex(c => c.phone.replace(/\D/g, '') === cleanPhone);
+    if (duplicateIdx !== -1) {
+      if (merge) {
+        // Merge tags and details
+        const existingTags = contacts[duplicateIdx].tags || [];
+        const mergedTags = Array.from(new Set([...existingTags, ...tagsArray]));
+        
+        contacts[duplicateIdx] = {
+          ...contacts[duplicateIdx],
+          name: name || contacts[duplicateIdx].name,
+          tags: mergedTags,
+          birthday: birthday || contacts[duplicateIdx].birthday || '',
+          anniversary: anniversary || contacts[duplicateIdx].anniversary || '',
+          paymentDate: paymentDate || contacts[duplicateIdx].paymentDate || '',
+          appointmentDate: appointmentDate || contacts[duplicateIdx].appointmentDate || ''
+        };
+        logToSystem(`Contact "${contacts[duplicateIdx].name}" merged & updated.`, 'info');
+      } else {
+        return res.status(400).json({
+          error: 'DUPLICATE_PHONE',
+          message: 'A contact with this phone number already exists.',
+          existingContact: contacts[duplicateIdx]
+        });
+      }
+    } else {
+      // Add new contact
+      const newContact = {
+        id: Date.now().toString(),
+        name,
+        phone,
+        tags: tagsArray,
+        birthday: birthday || '',
+        anniversary: anniversary || '',
+        paymentDate: paymentDate || '',
+        appointmentDate: appointmentDate || '',
+        lastAutomationSent: {}
+      };
+      contacts.push(newContact);
+      logToSystem(`Contact "${name}" added to list.`, 'info');
+    }
+  }
+
+  saveContacts();
+  io.emit('contacts_updated', contacts);
+  
+  // Trigger thank you rule if applicable
+  const savedContact = contacts.find(c => c.phone.replace(/\D/g, '') === cleanPhone);
+  if (savedContact) {
+    triggerThankYouIfNeeded(savedContact);
+  }
+
+  res.json({ success: true, contacts });
+});
+
+app.delete('/api/contacts/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const index = contacts.findIndex(c => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
+  const name = contacts[index].name;
+  contacts.splice(index, 1);
+  saveContacts();
+  logToSystem(`Contact "${name}" deleted.`, 'info');
+  io.emit('contacts_updated', contacts);
+  res.json({ success: true });
 });
 
 // Templates REST API
@@ -546,6 +961,163 @@ app.delete('/api/templates/:id', requireAuth, (req, res) => {
 
 
 
+// Automations REST API
+app.get('/api/automations', requireAuth, (req, res) => {
+  res.json(automations);
+});
+
+app.post('/api/automations', requireAuth, (req, res) => {
+  const { id, name, triggerType, targetTag, messageTemplate, delayHours, isActive } = req.body;
+  if (!name || !triggerType || !messageTemplate) {
+    return res.status(400).json({ error: 'Name, triggerType, and messageTemplate are required' });
+  }
+
+  if (id) {
+    // Edit existing rule
+    const idx = automations.findIndex(a => a.id === id);
+    if (idx !== -1) {
+      automations[idx] = {
+        id,
+        name,
+        triggerType,
+        targetTag: targetTag || '',
+        messageTemplate,
+        delayHours: parseInt(delayHours) || 0,
+        isActive: isActive !== undefined ? !!isActive : true
+      };
+      logToSystem(`Automation rule "${name}" updated.`, 'info');
+    } else {
+      return res.status(404).json({ error: 'Rule not found' });
+    }
+  } else {
+    // Add new rule
+    const newRule = {
+      id: Date.now().toString(),
+      name,
+      triggerType,
+      targetTag: targetTag || '',
+      messageTemplate,
+      delayHours: parseInt(delayHours) || 0,
+      isActive: true
+    };
+    automations.push(newRule);
+    logToSystem(`Automation rule "${name}" created.`, 'info');
+  }
+
+  saveAutomations();
+  io.emit('automations_updated', automations);
+  res.json({ success: true, automations });
+});
+
+app.delete('/api/automations/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const index = automations.findIndex(a => a.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Rule not found' });
+  }
+
+  const name = automations[index].name;
+  automations.splice(index, 1);
+  saveAutomations();
+  logToSystem(`Automation rule "${name}" deleted.`, 'info');
+  io.emit('automations_updated', automations);
+  res.json({ success: true });
+});
+
+// Thank you automation helper
+function triggerThankYouIfNeeded(contact) {
+  if (clientStatus !== 'CONNECTED' || !client) return;
+  const thankYouRules = automations.filter(r => r.isActive && r.triggerType === 'THANK_YOU');
+  for (let rule of thankYouRules) {
+    if (!rule.targetTag || (contact.tags && contact.tags.includes(rule.targetTag))) {
+      // Check if already sent
+      if (!contact.lastAutomationSent) contact.lastAutomationSent = {};
+      if (contact.lastAutomationSent[rule.id]) continue; // already sent thank you
+
+      let formattedNumber = contact.phone.replace(/\D/g, '');
+      if (formattedNumber.length === 10) {
+        formattedNumber = '91' + formattedNumber;
+      }
+      const chatId = `${formattedNumber}@c.us`;
+      let message = rule.messageTemplate
+        .replaceAll('{name}', contact.name)
+        .replaceAll('{phone}', contact.phone);
+
+      logToSystem(`Triggered thank you automation "${rule.name}" for ${contact.name}...`, 'info');
+      client.sendMessage(chatId, message).then(() => {
+        logToSystem(`Thank you message sent successfully to +${formattedNumber}!`, 'success');
+        io.emit('message_sent', { to: formattedNumber, body: message });
+        contact.lastAutomationSent[rule.id] = new Date().toISOString();
+        saveContacts();
+        io.emit('contacts_updated', contacts);
+      }).catch(err => {
+        logToSystem(`Failed to send thank you: ${err.message}`, 'error');
+      });
+    }
+  }
+}
+
+// Sequences REST API
+app.get('/api/sequences', requireAuth, (req, res) => {
+  res.json(sequences);
+});
+
+app.post('/api/sequences', requireAuth, (req, res) => {
+  const { id, name, targetTag, steps, isActive } = req.body;
+  if (!name || !steps || !Array.isArray(steps)) {
+    return res.status(400).json({ error: 'Name and steps array are required' });
+  }
+
+  if (id) {
+    // Edit existing sequence
+    const idx = sequences.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      sequences[idx] = {
+        id,
+        name,
+        targetTag: targetTag || '',
+        steps,
+        isActive: isActive !== undefined ? !!isActive : true
+      };
+      logToSystem(`Sequence "${name}" updated.`, 'info');
+    } else {
+      return res.status(404).json({ error: 'Sequence not found' });
+    }
+  } else {
+    // Add new sequence
+    const newSeq = {
+      id: Date.now().toString(),
+      name,
+      targetTag: targetTag || '',
+      steps,
+      isActive: true
+    };
+    sequences.push(newSeq);
+    logToSystem(`Sequence "${name}" created.`, 'info');
+  }
+
+  saveSequences();
+  io.emit('sequences_updated', sequences);
+  res.json({ success: true, sequences });
+});
+
+app.delete('/api/sequences/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const index = sequences.findIndex(s => s.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Sequence not found' });
+  }
+
+  const name = sequences[index].name;
+  sequences.splice(index, 1);
+  saveSequences();
+  logToSystem(`Sequence "${name}" deleted.`, 'info');
+  io.emit('sequences_updated', sequences);
+  res.json({ success: true });
+});
+
+
+
 // Authenticate socket connection
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
@@ -565,14 +1137,20 @@ io.on('connection', (socket) => {
   socket.emit('initial_logs', systemLogs);
   socket.emit('scheduled_updated', scheduledMessages);
   socket.emit('templates_updated', templates);
+  socket.emit('contacts_updated', contacts);
+  socket.emit('automations_updated', automations);
+  socket.emit('sequences_updated', sequences);
 });
 
 // Connect/Initialize WhatsApp manually
 app.post('/api/connect', requireAuth, (req, res) => {
+  const { pairingNumber } = req.body;
   if (clientStatus !== 'DISCONNECTED') {
     return res.json({ success: true, message: 'WhatsApp client is already active or initializing.' });
   }
-  initializeWhatsApp();
+
+  const cleanNumber = pairingNumber ? pairingNumber.replace(/\D/g, '') : null;
+  initializeWhatsApp(cleanNumber);
   res.json({ success: true });
 });
 
