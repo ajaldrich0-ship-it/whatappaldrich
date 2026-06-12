@@ -271,6 +271,11 @@ async function checkScheduledMessages() {
 
   for (let msg of scheduledMessages) {
     if (msg.status === 'PENDING' && new Date(msg.scheduledTime) <= now) {
+      msg.status = 'SENDING';
+      changed = true;
+      saveScheduledMessages();
+      io.emit('scheduled_updated', scheduledMessages);
+
       logToSystem(`Processing scheduled message for ${msg.number}...`, 'info');
       try {
         let formattedNumber = msg.number.replace(/\D/g, '');
@@ -289,7 +294,6 @@ async function checkScheduledMessages() {
         msg.error = err.message;
         logToSystem(`Failed to send scheduled message: ${err.message}`, 'error');
       }
-      changed = true;
     }
   }
 

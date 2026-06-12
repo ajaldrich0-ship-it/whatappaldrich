@@ -921,7 +921,9 @@ function renderScheduledTable() {
     row.className = 'border-b border-slate-200 hover:bg-slate-50 transition-colors';
     
     let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/10 text-yellow-600">PENDING</span>';
-    if (msg.status === 'SENT') {
+    if (msg.status === 'SENDING') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 animate-pulse">SENDING</span>';
+    } else if (msg.status === 'SENT') {
       statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600">SENT</span>';
     } else if (msg.status === 'FAILED') {
       statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600" title="${escapeHtml(msg.error || '')}">FAILED</span>`;
@@ -935,7 +937,7 @@ function renderScheduledTable() {
       <td class="py-4 px-4 text-slate-500">${formattedDate}</td>
       <td class="py-4 px-4">${statusBadge}</td>
       <td class="py-4 px-4 text-right">
-        ${msg.status === 'PENDING' ? `<button onclick="cancelScheduledMessage('${msg.id}')" class="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors">Cancel</button>` : '<span class="text-slate-600">-</span>'}
+        ${msg.status === 'PENDING' ? `<button onclick="cancelScheduledMessage('${msg.id}')" class="text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors">Cancel</button>` : '<span class="text-slate-400">-</span>'}
       </td>
     `;
     tbody.appendChild(row);
