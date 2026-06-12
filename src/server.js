@@ -277,14 +277,9 @@ async function checkScheduledMessages() {
           formattedNumber = '91' + formattedNumber;
         }
 
-        const numberId = await client.getNumberId(formattedNumber);
-        if (!numberId) {
-          msg.status = 'FAILED';
-          msg.error = 'Invalid number or not registered on WhatsApp';
-          logToSystem(`Scheduled message failed: Number +${formattedNumber} is invalid.`, 'error');
-        } else {
-          await client.sendMessage(numberId._serialized, msg.message);
-          msg.status = 'SENT';
+        const chatId = `${formattedNumber}@c.us`;
+        await client.sendMessage(chatId, msg.message);
+        msg.status = 'SENT';
           msg.sentTime = new Date().toISOString();
           logToSystem(`Scheduled message sent successfully to +${formattedNumber}!`, 'success');
           io.emit('message_sent', { to: formattedNumber, body: msg.message });
@@ -412,15 +407,7 @@ app.post('/api/send', requireAuth, async (req, res) => {
       formattedNumber = '91' + formattedNumber;
     }
 
-    // Resolve WhatsApp ID
-    const numberId = await client.getNumberId(formattedNumber);
-    if (!numberId) {
-      return res.status(400).json({ 
-        error: `The number +${formattedNumber} is not registered on WhatsApp or is invalid. Please verify and include the correct country code.` 
-      });
-    }
-
-    const chatId = numberId._serialized;
+    const chatId = `${formattedNumber}@c.us`;
     await client.sendMessage(chatId, message);
     
     logToSystem(`Sent manual message to ${formattedNumber}: "${message}"`, 'outgoing');
