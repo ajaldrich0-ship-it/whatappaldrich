@@ -247,7 +247,8 @@ function initializeWhatsApp(pairingNumber = null) {
         '--disable-dev-shm-usage',
         '--no-zygote',
         '--single-process',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--ignore-certificate-errors'
       ]
     }
   });
@@ -290,11 +291,17 @@ function initializeWhatsApp(pairingNumber = null) {
   });
 
   client.on('message', async (msg) => {
+    // Ignore internal WhatsApp multi-device sync messages
+    if (msg.from.includes('@lid') || msg.from === 'status@broadcast') return;
+
     const body = msg.body.trim();
     const contact = await msg.getContact();
     const senderName = contact.pushname || msg.from;
 
-    logToSystem(`Received message from ${senderName}: "${body}"`, 'incoming');
+    // Only log if it's a real chat message
+    if (msg.type === 'chat' || body !== '') {
+      logToSystem(`Received message from ${senderName}: "${body}"`, 'incoming');
+    }
     io.emit('message_received', { from: senderName, body });
 
     // Update CRM tracking and check Welcome triggers
