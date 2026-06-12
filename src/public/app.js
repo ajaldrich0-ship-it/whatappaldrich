@@ -2164,4 +2164,253 @@ async function requestPairingCodeFlow() {
   }
 }
 
+// LANDING PAGE LIVE DATA ANIMATION
+(function initLandingPageLiveData() {
+  // Data arrays
+  let sentData = [80, 100, 95, 120, 110, 130, 145, 135, 150, 165];
+  let deliveredData = [70, 90, 88, 110, 100, 120, 135, 125, 140, 155];
+  let repliesData = [20, 25, 22, 30, 28, 35, 40, 38, 45, 50];
+  let workflowBarWidth = 60;
+  
+  // Counter values
+  let sentCount = 1248;
+  let deliveredCount = 1186;
+  let repliesCount = 342;
+  let scheduledCount = 86;
+  let vipContacts = 128;
+  let leadsContacts = 342;
+
+  // DOM elements
+  const sentCounterEl = document.getElementById('live-sent-counter');
+  const deliveredCounterEl = document.getElementById('live-delivered-counter');
+  const repliesCounterEl = document.getElementById('live-replies-counter');
+  const scheduledCounterEl = document.getElementById('live-scheduled-counter');
+  const sentPctEl = document.getElementById('live-sent-pct');
+  const pendingEl = document.getElementById('live-pending');
+  const repliesPctEl = document.getElementById('live-replies-pct');
+  const sentLineEl = document.getElementById('live-sent-line');
+  const deliveredLineEl = document.getElementById('live-delivered-line');
+  const repliesLineEl = document.getElementById('live-reply-line');
+  const sentAreaEl = document.getElementById('live-sent-area');
+  const deliveredAreaEl = document.getElementById('live-delivered-area');
+  const pulseDotEl = document.getElementById('live-pulse-dot');
+  const pulseRingEl = document.getElementById('live-pulse-ring');
+  const uptimeEl = document.getElementById('live-uptime');
+  const uptimeBarEl = document.getElementById('live-uptime-bar');
+  const mockVipContactsEl = document.getElementById('mock-vip-contacts');
+  const mockLeadsContactsEl = document.getElementById('mock-leads-contacts');
+  const workflowBarEl = document.getElementById('workflow-bar');
+  const donutDeliveredEl = document.getElementById('donut-delivered');
+  const donutReadEl = document.getElementById('donut-read');
+  const donutFailedEl = document.getElementById('donut-failed');
+  const donutPendingEl = document.getElementById('donut-pending');
+  const donutTotalValEl = document.getElementById('donut-total-val');
+  const donutDeliveredPctEl = document.getElementById('donut-delivered-pct');
+  const donutReadPctEl = document.getElementById('donut-read-pct');
+  const donutFailedPctEl = document.getElementById('donut-failed-pct');
+  const donutPendingPctEl = document.getElementById('donut-pending-pct');
+
+  // Uptime tracking
+  let uptimeSeconds = 14 * 3600 + 23 * 60 + 7; // 14:23:07
+
+  // Chart dimensions
+  const chartWidth = 400;
+  const chartHeight = 160;
+  const chartPadding = 20;
+
+  // Format number with commas
+  function formatNumber(num) {
+    return num.toLocaleString();
+  }
+
+  // Generate line path from data
+  function generateLinePath(data, maxVal) {
+    const xStep = (chartWidth - chartPadding * 2) / (data.length - 1);
+    const points = data.map((val, i) => {
+      const x = chartPadding + i * xStep;
+      const y = chartHeight - chartPadding - (val / maxVal) * (chartHeight - chartPadding * 2);
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+    });
+    return points.join(' ');
+  }
+
+  // Generate area path from data
+  function generateAreaPath(data, maxVal) {
+    const linePath = generateLinePath(data, maxVal);
+    const lastX = chartPadding + (data.length - 1) * ((chartWidth - chartPadding * 2) / (data.length - 1));
+    return `${linePath} L ${lastX} ${chartHeight} L ${chartPadding} ${chartHeight} Z`;
+  }
+
+  // Update line chart
+  function updateLineChart() {
+    const maxVal = Math.max(...sentData, ...deliveredData, ...repliesData) * 1.1;
+    
+    if (sentLineEl) sentLineEl.setAttribute('d', generateLinePath(sentData, maxVal));
+    if (deliveredLineEl) deliveredLineEl.setAttribute('d', generateLinePath(deliveredData, maxVal));
+    if (repliesLineEl) repliesLineEl.setAttribute('d', generateLinePath(repliesData, maxVal));
+    
+    if (sentAreaEl) sentAreaEl.setAttribute('d', generateAreaPath(sentData, maxVal));
+    if (deliveredAreaEl) deliveredAreaEl.setAttribute('d', generateAreaPath(deliveredData, maxVal));
+
+    // Update pulse dot
+    if (pulseDotEl && pulseRingEl) {
+      const lastSentVal = sentData[sentData.length - 1];
+      const x = chartWidth - chartPadding;
+      const y = chartHeight - chartPadding - (lastSentVal / maxVal) * (chartHeight - chartPadding * 2);
+      pulseDotEl.setAttribute('cx', x);
+      pulseDotEl.setAttribute('cy', y);
+      pulseRingEl.setAttribute('cx', x);
+      pulseRingEl.setAttribute('cy', y);
+    }
+  }
+
+  // Update workflow single bar
+  function updateWorkflowBarChart() {
+    if (workflowBarEl) {
+      workflowBarEl.style.width = `${workflowBarWidth}%`;
+    }
+  }
+
+  // Update donut chart
+  function updateDonutChart() {
+    const total = sentCount;
+    const delivered = Math.floor(deliveredCount);
+    const read = Math.floor(delivered * 0.6);
+    const failed = Math.floor(sentCount * 0.02);
+    const pending = sentCount - delivered - failed;
+
+    const donutTotal = delivered + read + failed + pending;
+    const pctDelivered = (delivered / donutTotal * 100).toFixed(0);
+    const pctRead = (read / donutTotal * 100).toFixed(0);
+    const pctFailed = (failed / donutTotal * 100).toFixed(0);
+    const pctPending = (pending / donutTotal * 100).toFixed(0);
+
+    if (donutDeliveredEl) donutDeliveredEl.setAttribute('stroke-dasharray', `${pctDelivered} ${100 - pctDelivered}`);
+    if (donutReadEl) {
+      donutReadEl.setAttribute('stroke-dasharray', `${pctRead} ${100 - pctRead}`);
+      donutReadEl.setAttribute('stroke-dashoffset', -pctDelivered);
+    }
+    if (donutFailedEl) {
+      donutFailedEl.setAttribute('stroke-dasharray', `${pctFailed} ${100 - pctFailed}`);
+      donutFailedEl.setAttribute('stroke-dashoffset', -(parseFloat(pctDelivered) + parseFloat(pctRead)));
+    }
+    if (donutPendingEl) {
+      donutPendingEl.setAttribute('stroke-dasharray', `${pctPending} ${100 - pctPending}`);
+      donutPendingEl.setAttribute('stroke-dashoffset', -(parseFloat(pctDelivered) + parseFloat(pctRead) + parseFloat(pctFailed)));
+    }
+    
+    if (donutTotalValEl) donutTotalValEl.textContent = formatNumber(total);
+    if (donutDeliveredPctEl) donutDeliveredPctEl.textContent = `${pctDelivered}%`;
+    if (donutReadPctEl) donutReadPctEl.textContent = `${pctRead}%`;
+    if (donutFailedPctEl) donutFailedPctEl.textContent = `${pctFailed}%`;
+    if (donutPendingPctEl) donutPendingPctEl.textContent = `${pctPending}%`;
+  }
+
+  // Helper function to animate number changes
+  function animateNumber(element, newValue) {
+    if (!element) return;
+    
+    // Use smooth CSS transform for visual feedback
+    element.style.transition = 'transform 0.2s ease-out';
+    element.style.transform = 'scale(1.05)';
+    setTimeout(() => {
+      element.style.transform = 'scale(1)';
+    }, 200);
+    
+    element.textContent = formatNumber(newValue);
+  }
+
+  // Update counters
+  function updateCounters() {
+    // Generate random increments
+    const sentInc = Math.floor(Math.random() * 5) + 1;
+    const deliveredInc = Math.floor(Math.random() * 4) + 1;
+    const repliesInc = Math.floor(Math.random() * 2) + 1;
+    const scheduledChange = Math.floor(Math.random() * 3) - 1; // -1, 0, 1
+
+    sentCount += sentInc;
+    deliveredCount += deliveredInc;
+    repliesCount += repliesInc;
+    scheduledCount = Math.max(50, scheduledCount + scheduledChange);
+    vipContacts += Math.floor(Math.random() * 2);
+    leadsContacts += Math.floor(Math.random() * 3);
+
+    // Update DOM
+    animateNumber(sentCounterEl, sentCount);
+    animateNumber(deliveredCounterEl, deliveredCount);
+    animateNumber(repliesCounterEl, repliesCount);
+    animateNumber(scheduledCounterEl, scheduledCount);
+    animateNumber(mockVipContactsEl, vipContacts);
+    animateNumber(mockLeadsContactsEl, leadsContacts);
+    
+    const sentPct = (15 + Math.random() * 10).toFixed(1);
+    if (sentPctEl) sentPctEl.textContent = sentPct;
+    
+    const pendingVal = sentCount - deliveredCount;
+    if (pendingEl) pendingEl.textContent = pendingVal;
+    
+    const repliesPct = (20 + Math.random() * 15).toFixed(0);
+    if (repliesPctEl) repliesPctEl.textContent = repliesPct;
+  }
+
+  // Shift data arrays and add new values
+  function shiftDataArrays() {
+    // Shift line chart data
+    sentData.shift();
+    sentData.push(sentData[sentData.length - 1] + (Math.random() * 30 - 15));
+    
+    deliveredData.shift();
+    deliveredData.push(deliveredData[deliveredData.length - 1] + (Math.random() * 25 - 10));
+    
+    repliesData.shift();
+    repliesData.push(repliesData[repliesData.length - 1] + (Math.random() * 15 - 5));
+    
+    // Update workflow single bar width
+    const change = (Math.random() * 10 - 5); // ±5% change
+    workflowBarWidth = Math.max(20, Math.min(100, workflowBarWidth + change));
+  }
+
+  // Update uptime
+  function updateUptime() {
+    uptimeSeconds++;
+    const hrs = String(Math.floor(uptimeSeconds / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((uptimeSeconds % 3600) / 60)).padStart(2, '0');
+    const secs = String(uptimeSeconds % 60).padStart(2, '0');
+    
+    if (uptimeEl) uptimeEl.textContent = `${hrs}:${mins}:${secs}`;
+    
+    // Update uptime bar - smooth small variations
+    let currentWidth = parseFloat(uptimeBarEl.style.width) || 92;
+    const change = (Math.random() * 0.5 - 0.25);
+    currentWidth = Math.max(88, Math.min(97, currentWidth + change));
+    if (uptimeBarEl) uptimeBarEl.style.width = `${currentWidth}%`;
+  }
+
+  // Add smooth transitions to chart paths
+  if (sentLineEl) sentLineEl.style.transition = 'd 0.5s ease-in-out';
+  if (deliveredLineEl) deliveredLineEl.style.transition = 'd 0.5s ease-in-out';
+  if (repliesLineEl) repliesLineEl.style.transition = 'd 0.5s ease-in-out';
+  if (sentAreaEl) sentAreaEl.style.transition = 'd 0.5s ease-in-out';
+  if (deliveredAreaEl) deliveredAreaEl.style.transition = 'd 0.5s ease-in-out';
+  if (pulseDotEl) pulseDotEl.style.transition = 'cx 0.5s ease-in-out, cy 0.5s ease-in-out';
+  if (pulseRingEl) pulseRingEl.style.transition = 'cx 0.5s ease-in-out, cy 0.5s ease-in-out';
+  
+  // Initialize
+  updateLineChart();
+  updateWorkflowBarChart();
+  updateDonutChart();
+
+  // Animation loop - update every 1 second
+  setInterval(() => {
+    shiftDataArrays();
+    updateCounters();
+    updateLineChart();
+    updateWorkflowBarChart();
+    updateDonutChart();
+  }, 1000);
+
+  // Uptime updates every second
+  setInterval(updateUptime, 1000);
+})();
+
 

@@ -201,7 +201,20 @@
         }
 
         .live-pulse-ring {
-            animation: pulse-dot-ring 1.2s ease-out infinite;
+          animation: pulse-dot-ring 1.2s ease-out infinite;
+          transition: cx 0.5s ease-in-out, cy 0.5s ease-in-out;
+        }
+        
+        /* Add smooth transitions to all number counters */
+        #live-sent-counter,
+        #live-delivered-counter,
+        #live-replies-counter,
+        #live-scheduled-counter,
+        #mock-campaigns-val,
+        #mock-vip-contacts,
+        #mock-leads-contacts,
+        #donut-total-val {
+          display: inline-block;
         }
 
         .live-chart-grid line {
@@ -302,16 +315,11 @@
                                 <i data-lucide="git-branch" class="w-4 h-4"></i>
                             </div>
                         </div>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-3xl font-extrabold text-slate-800" id="mock-campaigns-val">12</span>
-                            <span class="text-[10px] text-slate-500 font-medium">Active Rules</span>
-                        </div>
-                        <!-- Mini sparkline SVG -->
+                        <!-- Single horizontal bar -->
                         <div class="pt-2">
-                            <svg class="w-full h-10 stroke-violet-500 fill-none" stroke-width="2" stroke-linecap="round"
-                                viewBox="0 0 100 30">
-                                <path id="mock-sparkline-1" d="M 0 25 L 20 18 L 40 22 L 60 10 L 80 15 L 100 5"></path>
-                            </svg>
+                          <div class="h-4 w-full bg-violet-100 rounded-full overflow-hidden">
+                            <div id="workflow-bar" class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-500 ease-in-out" style="width: 60%"></div>
+                          </div>
                         </div>
                     </div>
                 </div>
@@ -418,17 +426,17 @@
                                     <line x1="0" y1="40" x2="400" y2="40" />
                                     <line x1="0" y1="80" x2="400" y2="80" />
                                     <line x1="0" y1="120" x2="400" y2="120" />
-                                    <path id="live-delivered-area" fill="url(#deliveredAreaGrad)" stroke="none"
-                                        d="M 0 160 L 0 160 Z"></path>
-                                    <path id="live-sent-area" fill="url(#sentAreaGrad)" stroke="none"
-                                        d="M 0 160 L 0 160 Z"></path>
-                                    <path id="live-delivered-line" fill="none" stroke="#10b981" stroke-width="2.5"
-                                        stroke-linecap="round" stroke-linejoin="round" d="M 0 160"></path>
-                                    <path id="live-sent-line" fill="none" stroke="#3b82f6" stroke-width="2.5"
-                                        stroke-linecap="round" stroke-linejoin="round" d="M 0 160"></path>
-                                    <path id="live-reply-line" fill="none" stroke="#8b5cf6" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"
-                                        d="M 0 160"></path>
+                                    <path id="live-delivered-area" fill="url(#deliveredAreaGrad)" stroke="none" style="transition: d 0.5s ease-in-out"
+                                  d="M 0 160 L 0 160 Z"></path>
+                            <path id="live-sent-area" fill="url(#sentAreaGrad)" stroke="none" style="transition: d 0.5s ease-in-out"
+                                  d="M 0 160 L 0 160 Z"></path>
+                            <path id="live-delivered-line" fill="none" stroke="#10b981" stroke-width="2.5" style="transition: d 0.5s ease-in-out"
+                                  stroke-linecap="round" stroke-linejoin="round" d="M 0 160"></path>
+                            <path id="live-sent-line" fill="none" stroke="#3b82f6" stroke-width="2.5" style="transition: d 0.5s ease-in-out"
+                                  stroke-linecap="round" stroke-linejoin="round" d="M 0 160"></path>
+                            <path id="live-reply-line" fill="none" stroke="#8b5cf6" stroke-width="2" style="transition: d 0.5s ease-in-out"
+                                  stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"
+                                  d="M 0 160"></path>
                                     <circle id="live-pulse-dot" cx="400" cy="80" r="4" fill="#3b82f6"></circle>
                                     <circle id="live-pulse-ring" class="live-pulse-ring" cx="400" cy="80" r="4"
                                         fill="none" stroke="#3b82f6" stroke-width="1.5"></circle>
@@ -447,26 +455,26 @@
                                                 fill="none"
                                                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831">
                                             </path>
-                                            <path id="donut-delivered" class="text-emerald-500 transition-all duration-700"
-                                                stroke-dasharray="62 38" stroke-width="3.5" stroke-linecap="round"
-                                                stroke="currentColor" fill="none"
-                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831">
-                                            </path>
-                                            <path id="donut-read" class="text-blue-500 transition-all duration-700"
-                                                stroke-dasharray="22 78" stroke-dashoffset="-62" stroke-width="3.5"
-                                                stroke-linecap="round" stroke="currentColor" fill="none"
-                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831">
-                                            </path>
-                                            <path id="donut-failed" class="text-rose-400 transition-all duration-700"
-                                                stroke-dasharray="5 95" stroke-dashoffset="-84" stroke-width="3.5"
-                                                stroke-linecap="round" stroke="currentColor" fill="none"
-                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831">
-                                            </path>
-                                            <path id="donut-pending" class="text-amber-400 transition-all duration-700"
-                                                stroke-dasharray="11 89" stroke-dashoffset="-89" stroke-width="3.5"
-                                                stroke-linecap="round" stroke="currentColor" fill="none"
-                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831">
-                                            </path>
+                                            <path id="donut-delivered" class="text-emerald-500"
+                                  style="transition: stroke-dasharray 0.5s ease-in-out"
+                                  stroke-dasharray="62 38" stroke-width="3.5" stroke-linecap="round"
+                                  stroke="currentColor" fill="none"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                            <path id="donut-read" class="text-blue-500"
+                                  style="transition: stroke-dasharray 0.5s ease-in-out, stroke-dashoffset 0.5s ease-in-out"
+                                  stroke-dasharray="22 78" stroke-dashoffset="-62" stroke-width="3.5"
+                                  stroke-linecap="round" stroke="currentColor" fill="none"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                            <path id="donut-failed" class="text-rose-400"
+                                  style="transition: stroke-dasharray 0.5s ease-in-out, stroke-dashoffset 0.5s ease-in-out"
+                                  stroke-dasharray="5 95" stroke-dashoffset="-84" stroke-width="3.5"
+                                  stroke-linecap="round" stroke="currentColor" fill="none"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                            <path id="donut-pending" class="text-amber-400"
+                                  style="transition: stroke-dasharray 0.5s ease-in-out, stroke-dashoffset 0.5s ease-in-out"
+                                  stroke-dasharray="11 89" stroke-dashoffset="-89" stroke-width="3.5"
+                                  stroke-linecap="round" stroke="currentColor" fill="none"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
                                         </svg>
                                         <div class="absolute inset-0 flex flex-col items-center justify-center">
                                             <div id="donut-total-val"
