@@ -2413,4 +2413,18 @@ async function requestPairingCodeFlow() {
   setInterval(updateUptime, 1000);
 })();
 
-
+// Mobile Sidebar Toggle
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById('sidebar-menu');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  
+  if (sidebar && sidebar.classList.contains('hidden')) {
+    sidebar.classList.remove('hidden');
+    sidebar.classList.add('flex', 'absolute', 'shadow-2xl', 'h-full');
+    if (backdrop) backdrop.classList.remove('hidden');
+  } else if (sidebar) {
+    sidebar.classList.add('hidden');
+    sidebar.classList.remove('flex', 'absolute', 'shadow-2xl', 'h-full');
+    if (backdrop) backdrop.classList.add('hidden');
+  }
+}
