@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -198,7 +197,8 @@ function hashPassword(password) {
 
 // App Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/media', express.static(path.join(__dirname, '../media')));
 
@@ -1144,14 +1144,19 @@ io.on('connection', (socket) => {
 
 // Connect/Initialize WhatsApp manually
 app.post('/api/connect', requireAuth, (req, res) => {
-  const { pairingNumber } = req.body;
+  const pairingNumber = req.body && typeof req.body === 'object' ? req.body.pairingNumber : undefined;
   if (clientStatus !== 'DISCONNECTED') {
     return res.json({ success: true, message: 'WhatsApp client is already active or initializing.' });
   }
 
-  const cleanNumber = pairingNumber ? pairingNumber.replace(/\D/g, '') : null;
-  initializeWhatsApp(cleanNumber);
-  res.json({ success: true });
+  try {
+    const cleanNumber = pairingNumber ? String(pairingNumber).replace(/\D/g, '') : null;
+    initializeWhatsApp(cleanNumber);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error initializing WhatsApp connection:', err);
+    return res.status(500).json({ error: 'Failed to start WhatsApp connection', details: err.message });
+  }
 });
 
 // Passive startup message; connection is initiated manually from settings dashboard
