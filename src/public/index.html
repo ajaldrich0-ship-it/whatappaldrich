@@ -609,8 +609,13 @@
 
             <!-- Sidebar Navigation -->
             <nav class="flex-grow px-4 space-y-1.5 overflow-y-auto">
-                <button onclick="switchTab('overview')" id="tab-btn-overview"
+                <button onclick="switchTab('settings')" id="tab-btn-settings"
                     class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 bg-blue-50 text-blue-600 border border-blue-100">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    <span>WhatsApp Link</span>
+                </button>
+                <button onclick="switchTab('overview')" id="tab-btn-overview"
+                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
                     <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                     <span>Overview</span>
                 </button>
@@ -633,11 +638,6 @@
                     class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
                     <i data-lucide="contact" class="w-5 h-5"></i>
                     <span>Contact Segments</span>
-                </button>
-                <button onclick="switchTab('settings')" id="tab-btn-settings"
-                    class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">
-                    <i data-lucide="qr-code" class="w-5 h-5"></i>
-                    <span>WhatsApp Link</span>
                 </button>
                 <button onclick="switchTab('automations')" id="tab-btn-automations"
                     class="tab-btn w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all duration-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-transparent">

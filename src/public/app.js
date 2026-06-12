@@ -4,7 +4,7 @@ let socket = null;
 
 // Application State
 let authToken = localStorage.getItem('auth_token') || null;
-let activeTab = 'overview';
+let activeTab = 'settings';
 let autoReplies = {};
 let bulkCampaignRunning = false;
 let currentUptimeSeconds = 0;
@@ -71,6 +71,8 @@ function showDashboard() {
   loadAutomations();
   loadSequences();
   startUptimeCounter();
+  // Default to WhatsApp Link tab (first thing user needs)
+  switchTab('settings');
 }
 
 
