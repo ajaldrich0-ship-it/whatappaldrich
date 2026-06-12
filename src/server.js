@@ -280,10 +280,9 @@ async function checkScheduledMessages() {
         const chatId = `${formattedNumber}@c.us`;
         await client.sendMessage(chatId, msg.message);
         msg.status = 'SENT';
-          msg.sentTime = new Date().toISOString();
-          logToSystem(`Scheduled message sent successfully to +${formattedNumber}!`, 'success');
-          io.emit('message_sent', { to: formattedNumber, body: msg.message });
-        }
+        msg.sentTime = new Date().toISOString();
+        logToSystem(`Scheduled message sent successfully to +${formattedNumber}!`, 'success');
+        io.emit('message_sent', { to: formattedNumber, body: msg.message });
       } catch (err) {
         msg.status = 'FAILED';
         msg.error = err.message;
