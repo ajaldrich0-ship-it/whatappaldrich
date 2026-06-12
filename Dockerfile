@@ -17,6 +17,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Force rebuild to bypass any sticky Docker caches
+RUN echo "Force rebuild trigger: 2"
+
 # Copy application code
 COPY . .
 
