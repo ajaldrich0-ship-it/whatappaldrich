@@ -174,6 +174,7 @@ function initializeWhatsApp() {
     puppeteer: {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      protocolTimeout: 0, // Disable protocol timeout to prevent Runtime.callFunctionOn timeouts on Railway
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
